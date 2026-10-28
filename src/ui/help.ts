@@ -19,6 +19,7 @@ export function helpSheet(app: App): Sheet {
     ['1 - 6', 'Battle commands (Attack, Skill, Item, Guard, Swap, Flee) and list entries'],
     ['Tab', 'Cycle targets'],
     ['?', 'This help'],
+    ['M', 'Mute or unmute all sound'],
   ];
   s.fill([
     el('h3', 'Timed hits'),

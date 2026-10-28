@@ -1,76 +1,297 @@
 #!/usr/bin/env node
 /**
- * Packs sprites listed in a manifest into one PNG atlas plus a JSON index.
+ * Packs the sprites listed in a manifest into one PNG atlas plus a JSON index.
  *
- *   node tools/build-atlas.mjs tools/manifest.json public/atlas
+ *   node tools/build-atlas.mjs [tools/manifest.json] [public/atlas]
  *
- * Manifest: { "entries": [ { "key": "hero_tank_idle_0", "file": "assets/raw/pack/x.png", "x": 0, "y": 0, "w": 32, "h": 32,
- *             "scale": 1, "flip": false, "trim": false } ] }
- * `x,y,w,h` default to the whole file. `scale` is an integer nearest-neighbour upscale. `flip` mirrors horizontally.
- * `trim` cuts fully transparent borders (the index records the original box so anchors stay put).
- * Output: <out>.png and <out>.json ({ frames: { key: { x, y, w, h, ox, oy, sw, sh } } }).
+ * Manifest (see tools/manifest.json):
+ *   { "width": 1024, "groups": { "<name>": { ...defaults } }, "sprites": [ Sprite ] }
+ *
+ * Sprite: { "key", "group"?, "dir"?, "src"? | "anims"?, ...ops }
+ *   src / anims[name][i]: "file.png" | { "file", "x", "y", "w", "h" } | "file_{0-3}.png" (expands) |
+ *                         { "file", "strip": [n, w, h, x0?, y0?] } (n frames left to right)
+ *   ops (sprite or group level):
+ *     bgKey: "auto" | "rrggbb" colour-key the background (flood from the edges; keyAll: true keys every pixel)
+ *     tol: 0..255              colour-key tolerance (default 8)
+ *     recolor: { "rrggbb": "rrggbb" | ["rrggbb","rrggbb"] }  exact palette swap (an array alternates by row: stripes)
+ *     tint: "rrggbb"           greyscale then multiply (stone / statue looks)
+ *     bright: [brightness, saturation]   e.g. [1.08, 1.25]
+ *     flip: true               mirror horizontally (atlas frames face the side's canonical direction)
+ *     cell: [w, h]             logical cell in display px; size: small|medium|large picks 80/128/200 squares
+ *     px: n | "auto"           display pixel scale (atlas stays at native res; the game draws px times bigger);
+ *                              auto = integer fit from 2x up, quarter steps between 1x and 2x, area-downscale below 1x
+ *     maxPx: n                 cap for px auto (default 6)
+ *     down: true               painterly art: area-downscale to fit the cell, px 1
+ *     anchor: n                which frame's box anchors a multi-frame sprite (default 0)
+ *     face: 1 | -1 | 0         which way the baked frames face (1 right, -1 left, 0 n/a)
+ *     fps: { anim: n }         playback hints written to the index
+ * Output: <out>.png and <out>.json:
+ *   { width, height, frames: { "<key>:<anim>:<i>": { x, y, w, h, ox, oy, cw, ch, px } },
+ *     sprites: { "<key>": { face, cw, ch, anims: { idle: n, ... }, fps, smooth } } }   (smooth: painterly, draw filtered)
+ *   (ox, oy, cw, ch are display px: the frame sits at (ox, oy) inside a cw x ch cell, drawn w*px x h*px.)
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { PNG } from 'pngjs';
 
-const [manifestPath, outBase] = process.argv.slice(2);
-if (!manifestPath || !outBase) { console.error('usage: build-atlas <manifest.json> <out-base>'); process.exit(1); }
-
+const manifestPath = process.argv[2] ?? 'tools/manifest.json';
+const outBase = process.argv[3] ?? 'public/atlas';
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+const SIZES = { small: [80, 80], medium: [128, 128], large: [200, 200], icon: [16, 16], portrait: [96, 96] };
+
 const cache = new Map();
 function load(file) {
-  if (!cache.has(file)) cache.set(file, PNG.sync.read(fs.readFileSync(file)));
+  if (!cache.has(file)) {
+    if (!fs.existsSync(file)) throw new Error('missing source: ' + file);
+    cache.set(file, PNG.sync.read(fs.readFileSync(file)));
+  }
   return cache.get(file);
 }
 
-/** Cut a region into its own PNG, with scale and flip. */
-function extract(e) {
-  const src = load(e.file);
-  const x0 = e.x ?? 0, y0 = e.y ?? 0, w = e.w ?? src.width - x0, h = e.h ?? src.height - y0;
-  const s = Math.max(1, Math.round(e.scale ?? 1));
-  const out = new PNG({ width: w * s, height: h * s });
-  for (let y = 0; y < h * s; y++) for (let x = 0; x < w * s; x++) {
-    const sx = x0 + (e.flip ? w - 1 - Math.floor(x / s) : Math.floor(x / s)), sy = y0 + Math.floor(y / s);
-    const si = (sy * src.width + sx) * 4, di = (y * out.width + x) * 4;
-    out.data[di] = src.data[si]; out.data[di + 1] = src.data[si + 1]; out.data[di + 2] = src.data[si + 2]; out.data[di + 3] = src.data[si + 3];
-  }
-  let ox = 0, oy = 0, img = out;
-  if (e.trim) {
-    let minX = out.width, minY = out.height, maxX = -1, maxY = -1;
-    for (let y = 0; y < out.height; y++) for (let x = 0; x < out.width; x++) if (out.data[(y * out.width + x) * 4 + 3] > 0) { minX = Math.min(minX, x); minY = Math.min(minY, y); maxX = Math.max(maxX, x); maxY = Math.max(maxY, y); }
-    if (maxX >= 0) {
-      const tw = maxX - minX + 1, th = maxY - minY + 1;
-      const t = new PNG({ width: tw, height: th });
-      PNG.bitblt(out, t, minX, minY, tw, th, 0, 0);
-      ox = minX; oy = minY; img = t;
-    }
-  }
-  return { img, ox, oy, sw: out.width, sh: out.height };
+const hex = (h) => [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+const hexOf = (d, i) => ((d[i] << 16) | (d[i + 1] << 8) | d[i + 2]).toString(16).padStart(6, '0');
+
+/** "@name/rest" -> manifest.dirs[name]/rest. */
+function resolveDir(p) {
+  return p.replace(/^@([\w-]+)/, (_, n) => { if (!manifest.dirs?.[n]) throw new Error('unknown dir @' + n); return manifest.dirs[n]; });
 }
 
-const sprites = manifest.entries.map((e) => ({ e, ...extract(e) }));
-// shelf packing, tallest first
-sprites.sort((a, b) => b.img.height - a.img.height);
+/** Expand "a_{0-3}.png" and strips into plain source rects. */
+function expand(src, dir) {
+  dir = resolveDir(dir);
+  if (typeof src === 'string') {
+    const m = src.match(/\{(\d+)-(\d+)\}/);
+    if (m) {
+      const out = [];
+      for (let i = +m[1]; i <= +m[2]; i++) out.push({ file: path.join(dir, src.replace(m[0], String(i))) });
+      return out;
+    }
+    return [{ file: path.join(dir, src) }];
+  }
+  if (src.strip) {
+    const [n, w, h, x0 = 0, y0 = 0] = src.strip;
+    return Array.from({ length: n }, (_, i) => ({ file: path.join(dir, src.file), x: x0 + i * w, y: y0, w, h }));
+  }
+  return [{ ...src, file: path.join(dir, src.file) }];
+}
+
+function crop(s) {
+  const src = load(s.file);
+  const x0 = s.x ?? 0, y0 = s.y ?? 0, w = s.w ?? src.width - x0, h = s.h ?? src.height - y0;
+  const out = new PNG({ width: w, height: h });
+  PNG.bitblt(src, out, x0, y0, w, h, 0, 0);
+  return out;
+}
+
+function colorKey(img, o) {
+  if (!o.bgKey) return;
+  const d = img.data, W = img.width, H = img.height, tol = o.tol ?? 8;
+  const [kr, kg, kb] = o.bgKey === 'auto' ? [d[0], d[1], d[2]] : hex(o.bgKey);
+  const near = (i) => d[i + 3] > 0 && Math.abs(d[i] - kr) <= tol && Math.abs(d[i + 1] - kg) <= tol && Math.abs(d[i + 2] - kb) <= tol;
+  if (o.keyAll) { for (let i = 0; i < d.length; i += 4) if (near(i)) d[i] = d[i + 1] = d[i + 2] = d[i + 3] = 0; return; }
+  const seen = new Uint8Array(W * H), st = [];
+  for (let x = 0; x < W; x++) st.push(x, (H - 1) * W + x);
+  for (let y = 0; y < H; y++) st.push(y * W, y * W + W - 1);
+  while (st.length) {
+    const p = st.pop();
+    if (seen[p]) continue;
+    seen[p] = 1;
+    if (!near(p * 4) && d[p * 4 + 3] > 0) continue;
+    d[p * 4] = d[p * 4 + 1] = d[p * 4 + 2] = d[p * 4 + 3] = 0;
+    const x = p % W, y = (p / W) | 0;
+    if (x > 0) st.push(p - 1); if (x < W - 1) st.push(p + 1); if (y > 0) st.push(p - W); if (y < H - 1) st.push(p + W);
+  }
+}
+
+function recolor(img, o) {
+  const d = img.data;
+  if (o.recolor) {
+    const map = new Map(Object.entries(o.recolor).map(([k, v]) => [k.toLowerCase(), (Array.isArray(v) ? v : [v]).map(hex)]));
+    for (let i = 0; i < d.length; i += 4) {
+      if (!d[i + 3]) continue;
+      const to = map.get(hexOf(d, i));
+      if (!to) continue;
+      const y = Math.floor(i / 4 / img.width);
+      const c = to[y % to.length];
+      d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2];
+    }
+  }
+  if (o.tint) {
+    const [tr, tg, tb] = hex(o.tint);
+    for (let i = 0; i < d.length; i += 4) {
+      const l = (0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2]) / 255;
+      const k = Math.min(1.25, l * 1.35);
+      d[i] = Math.min(255, tr * k); d[i + 1] = Math.min(255, tg * k); d[i + 2] = Math.min(255, tb * k);
+    }
+  }
+  if (o.bright) {
+    const [b, s] = o.bright;
+    for (let i = 0; i < d.length; i += 4) {
+      const l = 0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2];
+      for (let k = 0; k < 3; k++) d[i + k] = Math.max(0, Math.min(255, (l + (d[i + k] - l) * s) * b));
+    }
+  }
+}
+
+/** Nearest downscale by an integer factor (art that ships pre-scaled). */
+function shrink(img, k) {
+  const out = new PNG({ width: Math.floor(img.width / k), height: Math.floor(img.height / k) });
+  for (let y = 0; y < out.height; y++) for (let x = 0; x < out.width; x++) {
+    const si = (y * k * img.width + x * k) * 4, di = (y * out.width + x) * 4;
+    for (let c = 0; c < 4; c++) out.data[di + c] = img.data[si + c];
+  }
+  return out;
+}
+
+function flipX(img) {
+  const out = new PNG({ width: img.width, height: img.height });
+  for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++) {
+    const si = (y * img.width + x) * 4, di = (y * img.width + img.width - 1 - x) * 4;
+    for (let k = 0; k < 4; k++) out.data[di + k] = img.data[si + k];
+  }
+  return out;
+}
+
+/** Opaque bounding box, or null. */
+function bbox(img) {
+  let x0 = img.width, y0 = img.height, x1 = -1, y1 = -1;
+  for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++) if (img.data[(y * img.width + x) * 4 + 3] > 8) {
+    if (x < x0) x0 = x; if (y < y0) y0 = y; if (x > x1) x1 = x; if (y > y1) y1 = y;
+  }
+  return x1 < 0 ? null : { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+}
+
+function sub(img, b) {
+  const out = new PNG({ width: b.w, height: b.h });
+  PNG.bitblt(img, out, b.x, b.y, b.w, b.h, 0, 0);
+  return out;
+}
+
+/** Area-average resample with premultiplied alpha (for painterly downscales). */
+function resample(img, W, H) {
+  const out = new PNG({ width: W, height: H });
+  const sx = img.width / W, sy = img.height / H;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    let r = 0, g = 0, b = 0, a = 0, n = 0;
+    const ax = x * sx, bx = (x + 1) * sx, ay = y * sy, by = (y + 1) * sy;
+    for (let yy = Math.floor(ay); yy < Math.ceil(by); yy++) for (let xx = Math.floor(ax); xx < Math.ceil(bx); xx++) {
+      const wx = Math.min(bx, xx + 1) - Math.max(ax, xx), wy = Math.min(by, yy + 1) - Math.max(ay, yy), wgt = wx * wy;
+      const i = (yy * img.width + xx) * 4, al = img.data[i + 3] / 255;
+      r += img.data[i] * al * wgt; g += img.data[i + 1] * al * wgt; b += img.data[i + 2] * al * wgt; a += al * wgt; n += wgt;
+    }
+    const i = (y * W + x) * 4;
+    if (a > 0) { out.data[i] = r / a; out.data[i + 1] = g / a; out.data[i + 2] = b / a; }
+    out.data[i + 3] = Math.round((a / n) * 255);
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------- build sprites
+
+const frames = []; // { key, img, ox, oy, px }
+const spritesIdx = {};
+
+// { "glob": "dir", "prefix": "icon_", ...ops } adds one sprite per PNG in dir
+const spriteList = (manifest.sprites ?? []).flatMap((s) => {
+  if (!s.glob) return [s];
+  const d = resolveDir(s.glob);
+  if (!fs.existsSync(d)) throw new Error('missing dir ' + d + ' (run tools/build-icons.mjs first?)');
+  return fs.readdirSync(d).filter((f) => f.endsWith('.png')).sort().map((f) => {
+    const { glob: _g, prefix = '', ...rest } = s;
+    return { ...rest, key: prefix + f.slice(0, -4), src: path.join(d, f) };
+  });
+});
+
+for (const raw of spriteList) {
+  const o = { ...(manifest.groups?.[raw.group] ?? {}), ...raw };
+  const dir = o.dir ?? '';
+  const cell = o.cell ?? SIZES[o.size ?? 'medium'];
+  const anims = o.anims ?? { idle: [o.src] };
+  // load + process every frame
+  const list = [];
+  for (const [anim, srcs] of Object.entries(anims)) {
+    const exp = (Array.isArray(srcs) ? srcs : [srcs]).flatMap((s) => expand(s, dir));
+    exp.forEach((s, i) => {
+      let img = crop({ ...s, file: resolveDir(s.file) });
+      if (o.shrink) img = shrink(img, o.shrink);
+      colorKey(img, o);
+      recolor(img, o);
+      list.push({ anim, i, img });
+    });
+  }
+  // pixel scale: from the anchor frame's opaque box (single-frame sprites are trimmed to their art)
+  const anchor = list[Math.min(o.anchor ?? 0, list.length - 1)];
+  const ab = bbox(anchor.img) ?? { x: 0, y: 0, w: anchor.img.width, h: anchor.img.height };
+  const multi = list.length > 1;
+  let px = o.px ?? 'auto';
+  let down = !!o.down;
+  if (px === 'auto') {
+    const ref = multi ? { w: Math.max(...list.map((f) => f.img.width)), h: Math.max(...list.map((f) => f.img.height)) } : ab;
+    // integer scales from 2x up; between 1x and 2x a quarter-step scale so big pixel art still fills its class
+    const fit = Math.min(cell[0] / ref.w, cell[1] / ref.h);
+    px = fit >= 2 ? Math.min(o.maxPx ?? 6, Math.floor(fit)) : fit >= 1 ? Math.max(1, Math.floor(fit * 0.95 * 4) / 4) : fit;
+    if (px < 1) { px = 1; down = true; }
+  }
+  if (down) {
+    // single painterly frame: fit its art box into the cell
+    const f = list[0];
+    const b = bbox(f.img) ?? ab;
+    const k = Math.min(cell[0] / b.w, cell[1] / b.h, 1);
+    f.img = resample(sub(f.img, b), Math.max(1, Math.round(b.w * k)), Math.max(1, Math.round(b.h * k)));
+  }
+  // placement: the anchor frame's art bottom-centre goes to the cell's bottom-centre; other frames share the offset
+  const cwN = cell[0] / px, chN = cell[1] / px;
+  const baseX = down ? 0 : cwN / 2 - (ab.x + ab.w / 2), baseY = down ? 0 : chN - (ab.y + ab.h);
+  const counts = {};
+  for (const f of list) {
+    const b = bbox(f.img);
+    counts[f.anim] = (counts[f.anim] ?? 0) + 1;
+    if (!b) { console.warn('empty frame', o.key, f.anim, f.i); continue; }
+    let img = sub(f.img, b);
+    let ox, oy;
+    if (down) { ox = (cwN - b.w) / 2; oy = chN - b.h; }
+    else { ox = Math.round(baseX) + b.x; oy = Math.round(baseY) + b.y; }
+    // mirror after placement so every frame keeps the anchor alignment
+    if (o.flip) { img = flipX(img); ox = cwN - ox - b.w; }
+    if (ox < -0.01 || oy < -0.01 || ox + b.w > cwN + 0.01) console.warn(`${o.key}:${f.anim}:${f.i} spills out of its cell (${ox},${oy} ${b.w}x${b.h} in ${cwN}x${chN})`);
+    frames.push({ key: `${o.key}:${f.anim}:${f.i}`, img, ox: ox * px, oy: oy * px, px });
+  }
+  spritesIdx[o.key] = { face: o.face ?? 0, cw: cell[0], ch: cell[1], anims: counts, ...(o.fps ? { fps: o.fps } : {}), ...(down ? { smooth: true } : {}) };
+}
+
+// legacy flat entries
+for (const e of manifest.entries ?? []) {
+  let img = crop(e);
+  if (e.flip) img = flipX(img);
+  frames.push({ key: e.key, img, ox: 0, oy: 0, px: e.scale ?? 1 });
+}
+
+// ---------------------------------------------------------------- pack (shelves, tallest first)
+
+frames.sort((a, b) => b.img.height - a.img.height || b.img.width - a.img.width);
 const PAD = 1;
-const maxW = manifest.width ?? 2048;
+const maxW = manifest.width ?? 1024;
 let x = PAD, y = PAD, shelf = 0, atlasW = 0;
 const placed = [];
-for (const s of sprites) {
-  if (x + s.img.width + PAD > maxW) { x = PAD; y += shelf + PAD; shelf = 0; }
-  placed.push({ s, x, y });
-  x += s.img.width + PAD;
-  shelf = Math.max(shelf, s.img.height);
+for (const f of frames) {
+  if (x + f.img.width + PAD > maxW) { x = PAD; y += shelf + PAD; shelf = 0; }
+  placed.push({ f, x, y });
+  x += f.img.width + PAD;
+  shelf = Math.max(shelf, f.img.height);
   atlasW = Math.max(atlasW, x);
 }
 const atlasH = y + shelf + PAD;
 const atlas = new PNG({ width: atlasW, height: atlasH });
-const frames = {};
+const index = {};
+const r2 = (v) => Math.round(v * 100) / 100;
 for (const p of placed) {
-  PNG.bitblt(p.s.img, atlas, 0, 0, p.s.img.width, p.s.img.height, p.x, p.y);
-  frames[p.s.e.key] = { x: p.x, y: p.y, w: p.s.img.width, h: p.s.img.height, ox: p.s.ox, oy: p.s.oy, sw: p.s.sw, sh: p.s.sh };
+  PNG.bitblt(p.f.img, atlas, 0, 0, p.f.img.width, p.f.img.height, p.x, p.y);
+  index[p.f.key] = { x: p.x, y: p.y, w: p.f.img.width, h: p.f.img.height, ox: r2(p.f.ox), oy: r2(p.f.oy), px: p.f.px };
 }
+// clear the colour of fully transparent pixels (smaller PNG, no fringes when the browser filters)
+for (let i = 0; i < atlas.data.length; i += 4) if (atlas.data[i + 3] === 0) atlas.data[i] = atlas.data[i + 1] = atlas.data[i + 2] = 0;
 fs.mkdirSync(path.dirname(outBase), { recursive: true });
-fs.writeFileSync(outBase + '.png', PNG.sync.write(atlas));
-fs.writeFileSync(outBase + '.json', JSON.stringify({ width: atlasW, height: atlasH, frames }));
-console.log(`${outBase}.png ${atlasW}x${atlasH}, ${placed.length} frames`);
+fs.writeFileSync(outBase + '.png', PNG.sync.write(atlas, { colorType: 6, deflateLevel: 9 }));
+fs.writeFileSync(outBase + '.json', JSON.stringify({ width: atlasW, height: atlasH, frames: index, sprites: spritesIdx }));
+const kb = (fs.statSync(outBase + '.png').size / 1024).toFixed(0);
+console.log(`${outBase}.png ${atlasW}x${atlasH} (${kb} KB), ${placed.length} frames, ${Object.keys(spritesIdx).length} sprites`);

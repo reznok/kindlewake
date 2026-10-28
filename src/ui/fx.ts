@@ -2,6 +2,7 @@
  * Battle effects: timer-driven tweens (they resolve even if frames are throttled), floating text, particles, screen
  * shake, hit-stop and banners. Everything is sampled at draw time.
  */
+import { FONT_NUM, FONT_UI } from './sprites';
 
 export type Ease = (t: number) => number;
 export const ease = {
@@ -113,7 +114,9 @@ export class Fx {
       const k = (t - f.t0) / f.dur;
       const pop = k < 0.15 ? 0.6 + (k / 0.15) * 0.55 : k < 0.3 ? 1.15 - ((k - 0.15) / 0.15) * 0.15 : 1;
       ctx.globalAlpha = k > 0.7 ? Math.max(0, 1 - (k - 0.7) / 0.3) : 1;
-      ctx.font = `900 ${Math.round(f.size * pop)}px ui-rounded, system-ui, sans-serif`;
+      // numbers in the 8-bit face (it runs wide, so a touch smaller), words in the body face
+      const num = /^[+-]?d/.test(f.text);
+      ctx.font = num ? `${Math.round(f.size * pop * 0.72)}px ${FONT_NUM}` : `700 ${Math.round(f.size * pop)}px ${FONT_UI}`;
       const y = f.y - f.rise * ease.out(Math.min(1, k * 1.6));
       ctx.lineWidth = Math.max(3, f.size / 5);
       ctx.strokeStyle = '#1d2b53';
@@ -130,7 +133,7 @@ export class Fx {
         ctx.globalAlpha = k < 0.1 ? k / 0.1 : k > 0.8 ? (1 - k) / 0.2 : 1;
         ctx.fillStyle = 'rgba(29,43,83,0.72)';
         ctx.fillRect(0, h / 2 - 36, w, 72);
-        ctx.font = `900 ${Math.round(Math.min(48, w / 12))}px ui-rounded, system-ui, sans-serif`;
+        ctx.font = `${Math.round(Math.min(32, w / 20))}px ${FONT_NUM}`;
         ctx.lineWidth = 6; ctx.strokeStyle = '#1d2b53';
         ctx.strokeText(b.text, w / 2, h / 2 + 2);
         ctx.fillStyle = b.color;

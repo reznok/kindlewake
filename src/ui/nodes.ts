@@ -168,7 +168,7 @@ export function openShop(app: App): Sheet | null {
           el('div.shop-info',
             el('div', el('b', it?.name ?? rl?.name ?? id), ' ', el('span.kind', rl ? 'relic' : it?.kind ?? ''), it?.type ? typeTag(it.type) : null, it?.power ? el('span.muted', ' power ' + it.power) : null, owned ? el('span.muted', ` (have ${owned})`) : null),
             el('div.muted', it?.desc ?? rl?.desc ?? '')),
-          btn(cost + 'g', () => { if (shopBuy(run, id)) { play('confirm'); app.log('Bought ' + (it?.name ?? rl?.name) + '.'); app.persist(); render(); app.refresh(); } }, 'small buy', { disabled: !!blocked, title: blocked || 'Buy' }),
+          btn(cost + 'g', () => { if (shopBuy(run, id)) { play('coin'); app.log('Bought ' + (it?.name ?? rl?.name) + '.'); app.persist(); render(); app.refresh(); } }, 'small buy', { disabled: !!blocked, title: blocked || 'Buy' }),
         );
       })) : el('p.muted', 'Sold out.'),
       el('p.muted.small', `Bag ${run.bag.length}/${bagSize(run)} • Relics ${run.relics.length}/${RELIC_MAX}`),
@@ -212,5 +212,6 @@ export function openReward(app: App): Sheet | null {
     }, 'big', { data: { default: '' } })]);
   };
   render();
+  play(ups.length ? 'levelup' : 'coin');
   return s.open();
 }

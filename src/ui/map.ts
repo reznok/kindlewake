@@ -12,7 +12,7 @@ import { keyDir, isConfirm } from './input';
 import { cap, KIND_COLOR, KIND_GLYPH, TYPE_COLOR } from './palette';
 import { openBag, openMenu, openRelics } from './sheets';
 import { openParty } from './party';
-import { drawActor, drawBackground, roundRect } from './sprites';
+import { drawActor, drawBackground, drawIcon, FONT_NUM, roundRect } from './sprites';
 
 let shownAct = '';
 
@@ -222,7 +222,7 @@ export class MapScreen implements Screen {
       this.clamp();
     }
     this.clamp();
-    drawBackground(ctx, 'map', w, h);
+    drawBackground(ctx, 'map', w, h, this.scroll);
     const run = this.run;
     const reach = new Set(reachable(run).map((n) => n.id));
     const at = run.map.at;
@@ -271,11 +271,15 @@ export class MapScreen implements Screen {
       ctx.lineWidth = 2;
       ctx.strokeStyle = 'rgba(255,255,255,0.8)';
       ctx.beginPath(); ctx.arc(p.x, p.y, r - 3, 0, Math.PI * 2); ctx.stroke();
-      ctx.fillStyle = n.kind === 'shop' || n.kind === 'camp' ? '#1d2b53' : '#fff';
-      ctx.font = `900 ${Math.round(r * (KIND_GLYPH[n.kind].length > 1 ? 0.8 : 1.05))}px ui-rounded, system-ui, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(KIND_GLYPH[n.kind], p.x, p.y + 1);
+      // node glyph: the 12 px pixel icon at an integer scale, else the letter
+      const isz = Math.max(12, Math.floor((r * 1.25) / 12) * 12);
+      if (!drawIcon(ctx, 'node_' + n.kind, Math.round(p.x - isz / 2), Math.round(p.y - isz / 2), isz)) {
+        ctx.fillStyle = n.kind === 'shop' || n.kind === 'camp' ? '#1d2b53' : '#fff';
+        ctx.font = `900 ${Math.round(r * (KIND_GLYPH[n.kind].length > 1 ? 0.8 : 1.05))}px ui-rounded, system-ui, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(KIND_GLYPH[n.kind], p.x, p.y + 1);
+      }
       if (n.done && n.id !== at) {
         ctx.strokeStyle = '#1d2b53'; ctx.lineWidth = 4;
         ctx.beginPath(); ctx.moveTo(p.x - r * 0.5, p.y); ctx.lineTo(p.x - r * 0.1, p.y + r * 0.4); ctx.lineTo(p.x + r * 0.55, p.y - r * 0.45); ctx.stroke();
@@ -304,7 +308,7 @@ export class MapScreen implements Screen {
       const s = 30;
       const tx = cur ? cur.x - s / 2 : this.pos.get(run.map.nodes.find((n) => n.col === 0)!.id)!.x - 68;
       const ty = cur ? cur.y - cur.r - s - 4 : this.surf.h / 2 - s / 2;
-      drawActor(ctx, CHARACTERS[lead.def].sprite, tx, ty, s, s, { label: CHARACTERS[lead.def].name, time: t, facing: 1 });
+      drawActor(ctx, CHARACTERS[lead.def].sprite, tx - s * 0.35, ty - s * 0.4, s * 1.7, s * 1.4, { label: CHARACTERS[lead.def].name, time: t, facing: 1 });
     }
     ctx.restore();
     // edge fades hint that the map scrolls
@@ -317,7 +321,7 @@ export class MapScreen implements Screen {
       ctx.fillStyle = 'rgba(29,43,83,0.75)';
       ctx.fillRect(0, h / 2 - 34, w, 68);
       ctx.fillStyle = '#ffe14d';
-      ctx.font = '900 38px ui-rounded, system-ui, sans-serif';
+      ctx.font = `28px ${FONT_NUM}`;
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(this.banner.text, w / 2, h / 2 + 2);
       ctx.restore();

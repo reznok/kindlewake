@@ -6,6 +6,7 @@ import { RELICS } from '../data/relics';
 import { UNLOCKS } from '../data/unlocks';
 import { bagSize, equip, RELIC_MAX } from '../engine/run';
 import type { App } from './app';
+import { CREDITS } from './credits';
 import { play } from './audio';
 import { btn, el } from './dom';
 import { toEnd, toTitle } from './flow';
@@ -109,9 +110,14 @@ export function openLedger(app: App): Sheet {
 export function openCredits(app: App): Sheet {
   const s = new Sheet(app, { title: 'Credits', cls: 'small' });
   s.fill([
-    el('p', el('b', 'Kindlewake'), ' — a browser party RPG.'),
-    el('p', 'Placeholder art for now: coloured shapes. Sprites, music and sound effects will come from CC0 / CC-BY packs, each listed in docs/CREDITS.md.'),
-    el('p.muted', 'Made with TypeScript and Vite.'),
+    el('p', el('b', 'Kindlewake'), ' — a browser party RPG. Art, music and sound by these generous creators:'),
+    el('ul.credits', CREDITS.map((c) => el('li',
+      el('b', c.pack), ' by ', c.author, ' ',
+      el('span.pill' + (c.licence.startsWith('CC-BY') ? '.good' : ''), c.licence), ' ',
+      el('a', { attrs: { href: c.url, target: '_blank', rel: 'noopener' } }, 'source'),
+      el('div.muted.small', c.use),
+    ))),
+    el('p.muted', 'UI glyphs drawn for Kindlewake. Made with TypeScript and Vite.'),
   ]);
   return s.open();
 }

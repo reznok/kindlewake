@@ -1,3 +1,7 @@
+/* Pixel fonts (SIL OFL 1.1, licences in public/fonts). Paths are relative so the Pages base path works. */
+@font-face { font-family: "Pixelify Sans"; src: url("/fonts/PixelifySans.ttf") format("truetype"); font-weight: 400 700; font-display: swap; }
+@font-face { font-family: "Press Start 2P"; src: url("/fonts/PressStart2P.ttf") format("truetype"); font-weight: 400; font-display: swap; }
+
 :root {
   --sky: #3fb6f5;
   --sky-2: #bdeeff;
@@ -15,7 +19,8 @@
   --orange: #ff9f1c;
   --muted: #6b7a99;
   --radius: 16px;
-  --font: ui-rounded, "SF Pro Rounded", "Nunito", "Segoe UI Variable Display", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font: "Pixelify Sans", ui-rounded, "SF Pro Rounded", "Nunito", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-8bit: "Press Start 2P", ui-monospace, monospace;
   --safe-t: env(safe-area-inset-top, 0px);
   --safe-r: env(safe-area-inset-right, 0px);
   --safe-b: env(safe-area-inset-bottom, 0px);
@@ -142,6 +147,7 @@ input.seed:focus-visible { outline: 4px solid var(--sun); }
 .bars .bar { height: 16px; margin: 3px 0; }
 .bars .bar .bar-label { line-height: 12px; }
 
+.type-tag .icon { display: inline-block; vertical-align: -2px; margin-right: 3px; image-rendering: pixelated; }
 .type-tag { display: inline-block; font-size: 10px; font-weight: 900; color: var(--ink); padding: 1px 6px; border-radius: 999px; border: 2px solid var(--ink); margin: 0 2px; vertical-align: middle; text-transform: uppercase; letter-spacing: 0.03em; }
 .type-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; border: 2px solid #fff; }
 .role-chip { display: inline-block; color: #fff; font-weight: 900; font-size: 11px; padding: 2px 8px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.04em; border: 2px solid var(--ink); }
@@ -162,8 +168,10 @@ input.seed:focus-visible { outline: 4px solid var(--sun); }
 .title-front { position: absolute; inset: 0; display: flex; align-items: center; justify-content: space-between; padding: 4% 6%; gap: 24px; pointer-events: none; }
 .title-front > * { pointer-events: auto; }
 .logo h1 {
-  font-size: clamp(40px, 9vw, 84px);
-  font-weight: 900;
+  font-family: var(--font-8bit);
+  font-size: clamp(26px, 6vw, 56px);
+  font-weight: 400;
+  image-rendering: pixelated;
   color: var(--sun);
   letter-spacing: 0.01em;
   -webkit-text-stroke: 3px var(--ink);
@@ -178,7 +186,7 @@ input.seed:focus-visible { outline: 4px solid var(--sun); }
 /* ---------------------------------------------------------------- generic screen head */
 
 .screen-head { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: rgba(255, 255, 255, 0.85); border-bottom: 3px solid var(--ink); }
-.screen-head h2 { font-size: 20px; flex: 1; }
+.screen-head h2 { font-family: var(--font-8bit); font-size: 15px; font-weight: 400; flex: 1; }
 .seed-label { font-weight: 800; font-size: 13px; display: flex; align-items: center; gap: 6px; }
 
 /* ---------------------------------------------------------------- roster */
@@ -222,6 +230,7 @@ input.seed:focus-visible { outline: 4px solid var(--sun); }
 .chip { font-weight: 900; border: 3px solid var(--ink); border-radius: 999px; padding: 4px 12px; background: #fff; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
 .chip.act { background: var(--sky-2); }
 .chip.gold { background: #fff3b0; }
+.chip.gold, .chip.act { font-family: var(--font-8bit); font-weight: 400; font-size: 11px; }
 .coin { width: 14px; height: 14px; border-radius: 50%; background: var(--sun); border: 2px solid var(--sun-d); display: inline-block; }
 .hp-sum { display: flex; gap: 6px; }
 .hp-mini { display: flex; flex-direction: column; font-size: 11px; font-weight: 800; width: 66px; }
@@ -401,3 +410,11 @@ table.runs td, table.runs th { padding: 3px 6px; border-bottom: 2px solid #eef1f
 .lvl-ups { display: flex; flex-wrap: wrap; gap: 6px; }
 .lvl-up { display: flex; align-items: center; gap: 6px; background: #fff; border: 2px solid var(--ink); border-radius: 12px; padding: 2px 8px 2px 4px; font-size: 14px; }
 .lvl-up .pill { margin: 0; padding: 1px 8px; font-size: 11px; }
+
+/* ---------------------------------------------------------------- art */
+
+canvas.icon { image-rendering: pixelated; }
+ul.credits { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 6px; }
+ul.credits li { line-height: 1.3; }
+ul.credits .pill { font-size: 10px; padding: 0 6px; margin: 0 2px; }
+ul.credits a { color: var(--ink-2); font-weight: 700; }

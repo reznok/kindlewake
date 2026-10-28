@@ -23,6 +23,7 @@ import { toggleHelp } from './help';
 import { isConfirm, keyDir } from './input';
 import { openReward } from './nodes';
 import { TYPE_COLOR } from './palette';
+import type { Anim } from './sprites';
 import { TimingRunner, windowSizes } from './timing';
 
 export class BattleScene implements Screen {
@@ -122,6 +123,13 @@ export class BattleScene implements Screen {
     const n = this.lines.length;
     this.msgPrev.textContent = (log ? this.lines[n - 2] : this.lines[n - 1]) ?? '';
     this.msgCur.textContent = text;
+  }
+
+  /** Switch an actor's sprite animation (idle / attack / hurt / cast); the view times it from now. */
+  setAnim(id: string, anim: Anim) {
+    const v = this.vis(id);
+    v.anim = anim === 'idle' ? undefined : anim;
+    v.animAt = performance.now();
   }
 
   rememberTarget(hero: string, target: string) { this.lastTargets.set(hero, target); }
@@ -258,6 +266,7 @@ export class BattleScene implements Screen {
     const home = this.fx.tween(this.vis(c.id), 'ox', 0, 260);
     await this.playEvents(evs);
     await home;
+    this.setAnim(c.id, 'idle');
   }
 
   private async enemyTurn(c: Combatant) {
@@ -287,6 +296,7 @@ export class BattleScene implements Screen {
     const home = this.fx.tween(this.vis(c.id), 'ox', 0, 260);
     await this.playEvents(evs);
     await home;
+    this.setAnim(c.id, 'idle');
   }
 
   private preview(c: Combatant, a: BattleAction): { hits: number; targets: string[]; label: string } {
@@ -314,11 +324,13 @@ export class BattleScene implements Screen {
     let dist = 34;
     if (b && tb && targets.length === 1) dist = Math.max(20, Math.min(Math.abs(tb.cx - b.cx) * 0.3, c.side === 'hero' ? 110 : 70));
     await this.fx.tween(v, 'ox', dir * dist, 300, (t) => 1 - Math.pow(1 - t, 3));
+    this.setAnim(c.id, 'attack');
     await this.fx.wait(200);
   }
 
   private async hop(c: Combatant) {
     const v = this.vis(c.id);
+    this.setAnim(c.id, 'cast');
     await this.fx.tween(v, 'oy', -12, 140);
     await this.fx.tween(v, 'oy', 0, 140);
   }
@@ -340,6 +352,7 @@ export class BattleScene implements Screen {
         this.fx.float(b.cx, b.y - 6, '...', '#c8d0e0', 18, 700);
       }
       if (kind === 'attack' || g !== 'miss') { v.flash = 1; void this.fx.tween(v, 'flash', 0, 220); }
+      if (kind === 'attack') this.setAnim(id, 'hurt');
     }
     play(g === 'perfect' ? (kind === 'attack' ? 'perfect' : 'guard') : kind === 'guard' && g === 'good' ? 'guard' : 'hit');
   }
@@ -370,6 +383,7 @@ export class BattleScene implements Screen {
         if (!b) return;
         const big = e.grade === 'perfect' && e.who.startsWith('h:');
         v.flash = 1; void fx.tween(v, 'flash', 0, 200);
+        if (e.dmg > 0) this.setAnim(e.target, 'hurt');
         const kick = tgt?.side === 'hero' ? 10 : -10;
         void fx.tween(v, 'ox', v.ox + kick, 60).then(() => fx.tween(v, 'ox', 0, 160));
         const text = e.immune ? 'Immune' : String(e.dmg) + (e.crit ? '!' : '');

@@ -11,6 +11,26 @@ OGA-BY terms.
 "Used for" is the planned role; packs not yet wired into the manifest are still listed so the record is complete. Delete the entry
 of any pack that is dropped before release.
 
+## Shipped in public/ (built by `npm run assets`)
+
+The in-game Credits sheet reads `src/ui/credits.ts`; keep it in step with this table.
+
+| File(s) | Packs inside | Licence |
+|---|---|---|
+| `public/atlas.png` / `.json` (heroes) | Tiny Tactics - Battle Kit I (Barty, Roz); Samurai, Ninja, Classic Pirate Captain, Mechanic, Ranger by DezrasDragons (Clem, Dell, Gertie, Kit, Pell); Classic Knight by Disthron (Ashlar). Recoloured / tinted. | CC0 |
+| `public/atlas.png` (portraits `por_*`) | Cute Heroes, Justin Nichol (warrior, assassin, cleric, paladin, bard, artificer, rogue, wizard), background removed, 96 px | **CC-BY 4.0** |
+| `public/atlas.png` (enemies `mon_*`) | 50+ Monsters Pack 2D; Tiny Creatures; 32x32 colorful slimes; Spring Monster Pack; Plant and Mushroom Enemies; Kica's Enemy Pack | CC0 |
+| `public/atlas.png` (enemies `mon_*`) | 10 Fantasy RPG enemies (Antifarea); RPG Enemies: 11 Dragons (Redshrike, Surt, Blarumyrran); Boss Cohort (Gilgaphoenixignis) | **CC-BY 3.0 / 4.0** |
+| `public/atlas.png` (`icon_*`) | Original glyphs drawn for this project (`tools/build-icons.mjs`) | CC0 (ours) |
+| `public/bg/bg_{meadow,forest,autumn,autumn_red,snow,desert,town,cave,dungeon,arena}.png` | Backgrounds (RPG battle backs), Nidhoggn; downscaled and brightened | CC0 |
+| `public/bg/bg_{lake,castle,keep,fort,mountains,sky,bridge,moon,volcano,jungle,grass}.png` | 14 Battle Backgrounds From Monster RPG 2, Matthew Smith | CC0 |
+| `public/bg/bg_title.png` | Meadow background, bart | CC0 |
+| `public/bg/bg_map.png` | Kenney Tiny Town (composed tile) | CC0 |
+| `public/fonts/PixelifySans.ttf`, `PressStart2P.ttf` (+ `OFL-*.txt`) | Pixelify Sans; Press Start 2P | SIL OFL 1.1 |
+| `public/audio/music_title.ogg`, `music_boss.ogg` | 4 Chiptunes (Adventure): Stage Select, Boss Fight, Juhani Junkala | CC0 |
+| `public/audio/music_map.ogg`, `music_camp.ogg`, `music_battle.ogg` | JRPG Pack 1 Grasslands, JRPG Pack 4 Calm3 Peaceful Days, JRPG Pack 5 Action3 Preparing For Battle, Juhani Junkala | CC0 |
+| `public/audio/sfx_*.ogg` | Kenney Interface Sounds (menu, confirm), Impact Sounds (hit, perfect, guard, break), Digital Audio (perfect, ko, heal, buff), Music Jingles (levelup), RPG Audio (coin) | CC0 |
+
 ## CC-BY packs (attribution required)
 
 | Pack | Author | Licence | URL | Used for |
@@ -27,11 +47,11 @@ of any pack that is dropped before release.
 | JS Monster Pack 4 - "Ascent" | JosephSeraph | CC-BY 3.0 (elected; page also lists CC-BY-SA 3.0) | https://opengameart.org/content/js-monster-pack-4-ascent | Enemy battlers (10) |
 | JS Monster Set - Elementals III | JosephSeraph | CC-BY 3.0 | https://opengameart.org/content/js-monster-set-elementals-iii | Elemental enemies |
 | Chibi Monsters Set 01 | ansimuz (ansimuz.com) | CC-BY 3.0 | https://opengameart.org/content/chibi-monsters-set-01 | Small animated enemies (candidate) |
-| 10 Fantasy RPG enemies | Stephen Challener (Redshrike), listed as CharlesGabriel | CC-BY 3.0 (elected; page also lists CC-BY-SA 3.0 / GPL) | https://opengameart.org/content/10-fantasy-rpg-enemies | Enemy battlers (slime, snake, goblin, cockatrice, ghost, wolf, dragon...) |
+| 10 Fantasy RPG enemies | Antifarea (artist named on the sheet), uploaded by CharlesGabriel | CC-BY 3.0 (elected; page also lists CC-BY-SA 3.0 / GPL) | https://opengameart.org/content/10-fantasy-rpg-enemies | Enemy battlers (slime, snake, goblin, cockatrice, ghost, wolf, dragon...) |
 | 10 basic rpg enemies | Stephen Challener (Redshrike) | CC-BY 3.0 (elected; page also lists OGA-BY 3.0) | https://opengameart.org/content/10-basic-rpg-enemies | Enemy battlers |
 | 6 More RPG Enemies | Stephen Challener (Redshrike, Blarumyrran, LordNeo) | CC-BY 3.0 (elected; page also lists OGA-BY 3.0) | https://opengameart.org/content/6-more-rpg-enemies | Enemy battlers |
 | More RPG enemies! | Stephen Challener (Redshrike) | CC-BY 3.0 (elected) | https://opengameart.org/content/more-rpg-enemies | Enemy battlers |
-| RPG Enemies: 11 Dragons | Redshrike and contributors (credit sheet in pack: `DAGRONS5Credit.png`) | CC-BY 3.0 | https://opengameart.org/content/rpg-enemies-11-dragons | Dragon bosses; credit every artist named in the credit sheet |
+| RPG Enemies: 11 Dragons | Redshrike and contributors (credit sheet in pack: `DAGRONS5Credit.png`; the three we ship are by Redshrike, Redshrike and Surt, Blarumyrran and Redshrike) | CC-BY 3.0 | https://opengameart.org/content/rpg-enemies-11-dragons | Dragon bosses; credit every artist named in the credit sheet |
 
 ## CC0 packs
 

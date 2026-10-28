@@ -39,8 +39,8 @@ export class TitleScreen implements Screen {
     this.stop = frameLoop((t) => {
       const { ctx, w, h } = this.surf;
       drawBackground(ctx, 'title', w, h);
-      const s = Math.min(70, h * 0.17);
-      heroes.forEach((c, i) => drawActor(ctx, c.sprite, w * 0.07 + i * s * 1.3, h - s * 1.25 - (i % 2) * s * 0.2, s, s, { label: c.name, time: t + i * 400, facing: 1 }));
+      const s = Math.min(96, h * 0.22);
+      heroes.forEach((c, i) => drawActor(ctx, c.sprite, w * 0.04 + i * s * 1.1, h - s * 1.12 - (i % 2) * s * 0.18, s * (160 / 112), s, { label: c.name, time: t + i * 400, facing: 1 }));
     });
     music('title');
     requestAnimationFrame(() => focusFirst(menu));

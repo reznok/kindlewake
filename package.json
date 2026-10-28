@@ -8,7 +8,10 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host",
     "test": "vitest run",
-    "atlas": "node tools/build-atlas.mjs"
+    "atlas": "node tools/build-icons.mjs && node tools/build-atlas.mjs tools/manifest.json public/atlas",
+    "backgrounds": "node tools/build-backgrounds.mjs",
+    "audio": "node tools/build-audio.mjs",
+    "assets": "npm run atlas && npm run backgrounds && npm run audio"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

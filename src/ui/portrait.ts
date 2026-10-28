@@ -5,7 +5,7 @@ import { STAT_KEYS } from '../core/types';
 import { statLabel } from '../engine/stats';
 import { el } from './dom';
 import { TYPE_COLOR, cap } from './palette';
-import { drawActor } from './sprites';
+import { drawActor, drawIcon, drawPortrait, hasSprite } from './sprites';
 
 export function portrait(key: string, label: string, size = 48, opts: { ko?: boolean } = {}): HTMLCanvasElement {
   const c = document.createElement('canvas');
@@ -17,12 +17,31 @@ export function portrait(key: string, label: string, size = 48, opts: { ko?: boo
   c.className = 'portrait';
   const ctx = c.getContext('2d')!;
   ctx.scale(dpr, dpr);
-  drawActor(ctx, key, size * 0.08, size * 0.06, size * 0.84, size * 0.88, { label, facing: 1, ko: opts.ko });
+  // painted portrait when the atlas has one (por_<id>), else the battler's idle frame
+  if (!drawPortrait(ctx, key, 0, 0, size, opts.ko)) {
+    if (hasSprite(key)) drawActor(ctx, key, size * 0.04, size * 0.04, size * 0.92, size * 0.92, { label, facing: 1 });
+    else drawActor(ctx, key, size * 0.08, size * 0.06, size * 0.84, size * 0.88, { label, facing: 1, ko: opts.ko });
+  }
+  return c;
+}
+
+/** A small DOM icon for an element / status glyph (falls back to a coloured dot). */
+export function iconEl(name: string, size = 14, color = '#ccc'): HTMLCanvasElement {
+  const c = document.createElement('canvas');
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  c.width = Math.round(size * dpr);
+  c.height = Math.round(size * dpr);
+  c.style.width = size + 'px';
+  c.style.height = size + 'px';
+  c.className = 'icon';
+  const ctx = c.getContext('2d')!;
+  ctx.scale(dpr, dpr);
+  if (!drawIcon(ctx, name, 0, 0, size)) { ctx.fillStyle = color; ctx.beginPath(); ctx.arc(size / 2, size / 2, size / 2.5, 0, Math.PI * 2); ctx.fill(); }
   return c;
 }
 
 export function typeTag(t: DamageType): HTMLElement {
-  return el('span.type-tag', { style: { background: TYPE_COLOR[t] }, title: cap(t) }, cap(t));
+  return el('span.type-tag', { style: { background: TYPE_COLOR[t] }, title: cap(t) }, iconEl(t, 12, TYPE_COLOR[t]), cap(t));
 }
 
 export function typeDot(t: DamageType): HTMLElement {
