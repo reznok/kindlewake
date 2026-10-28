@@ -115,7 +115,7 @@ defineAbilities([
   { id: 'e_heavy_blunt', name: 'Heavy blow', desc: 'A huge blunt blow.', mp: 0, target: 'enemy', hits: [atk('blunt', 170)], delay: 1.2 },
 
   // Jamble
-  { id: 'e_preserve', name: 'Preserve', desc: 'Tops up every foe a little.', mp: 0, target: 'allies', effects: [{ kind: 'heal', power: 55, scale: 'mag' }] },
+  { id: 'e_preserve', name: 'Preserve', desc: 'Tops up every foe a little.', mp: 0, target: 'allies', effects: [{ kind: 'heal', power: 30, scale: 'mag' }] },
   // Scab Bee
   { id: 'e_working_lunch', name: 'Working Lunch', desc: 'Heals itself.', mp: 0, target: 'self', effects: [{ kind: 'heal', power: 80, scale: 'mag' }] },
   { id: 'e_overtime', name: 'Overtime', desc: 'Three stings; may Poison (3).', mp: 0, target: 'enemy', hits: times(3, atk('pierce', 40)), effects: [st('poison', 3, 0.5)] },
@@ -153,7 +153,7 @@ defineAbilities([
   { id: 'e_chew', name: 'Chew', desc: 'Pierce 80; may Bleed (2).', mp: 0, target: 'enemy', hits: [atk('pierce', 80)], effects: [st('bleed', 2, 0.6)] },
   // Waistcoat Wasp
   { id: 'e_wasp_sting', name: 'Sting', desc: 'Pierce 90; may Poison (3).', mp: 0, target: 'enemy', hits: [atk('pierce', 90)], effects: [st('poison', 3, 0.5)] },
-  { id: 'e_invite_itself', name: 'Invite Itself', desc: 'Another wasp arrives.', mp: 0, target: 'self', effects: [{ kind: 'summon', enemy: 'a1_waistcoat_wasp', max: 2 }] },
+  { id: 'e_invite_itself', name: 'Invite Itself', desc: 'Another wasp arrives.', mp: 0, target: 'self', effects: [{ kind: 'summon', enemy: 'a1_waistcoat_wasp', max: 1 }] },
 
   // ---- Baron Bleatham (elite)
   { id: 'e_toll_ten', name: 'Toll: Ten Buttons', desc: 'Blunt 100.', mp: 0, target: 'enemy', hits: [atk('blunt', 100)] },
@@ -161,7 +161,7 @@ defineAbilities([
   { id: 'e_call_counsel', name: 'Call Counsel', desc: 'Calls a Toll Goat (if none stands).', mp: 0, target: 'self', effects: [{ kind: 'summon', enemy: 'a1_toll_goat', max: 1 }] },
   { id: 'e_pay_up', name: 'PAY UP', desc: 'The top rung. Blunt 110 to every hero.', mp: 0, target: 'enemies', hits: [atk('blunt', 110)], delay: 1.2 },
   // ---- Conserve Colossus (elite)
-  { id: 'e_spread_thin', name: 'Spread Thin', desc: 'Sheds a Jamble.', mp: 0, target: 'self', effects: [{ kind: 'summon', enemy: 'a1_jamble', max: 3 }] },
+  { id: 'e_spread_thin', name: 'Spread Thin', desc: 'Sheds a Jamble.', mp: 0, target: 'self', effects: [{ kind: 'summon', enemy: 'a1_jamble', max: 2 }] },
   { id: 'e_wave_of_jam', name: 'Wave of Jam', desc: 'Frost 50 to every hero; may Chill (2).', mp: 0, target: 'enemies', hits: [atk('frost', 50)], effects: [st('chill', 2, 0.4)] },
   { id: 'e_seal_jar', name: 'Seal the Jar', desc: 'Blunt 170 and Chill (2).', mp: 0, target: 'enemy', hits: [atk('blunt', 170)], effects: [st('chill', 2)], delay: 1.2 },
   // ---- Sister Nocturne (elite)

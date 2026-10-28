@@ -9,7 +9,7 @@ export function charDef(m: PartyMember): CharacterDef { return CHARACTERS[m.def]
 export function sparkDef(m: PartyMember, id: string): SparkDef | undefined { return charDef(m).sparks.find((s) => s.id === id); }
 
 /** XP needed to reach a level (cumulative). */
-export function xpForLevel(level: number): number { return Math.round(20 * Math.pow(Math.max(0, level - 1), 1.5)); }
+export function xpForLevel(level: number): number { return Math.round(14 * Math.pow(Math.max(0, level - 1), 1.5)); }
 
 export const MAX_LEVEL = 20;
 

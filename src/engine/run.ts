@@ -103,7 +103,7 @@ export function genMap(r: Rng, act: 1 | 2 | 3, ledger: Ledger, run: Run): ActMap
     if (n.kind === 'fight' || n.kind === 'elite' || n.kind === 'boss') {
       if (!pools[n.kind].length) throw new Error('no encounters for act ' + act + ' ' + n.kind);
       n.encounter = pickEnc(pools[n.kind]);
-      n.level = base + Math.floor(n.col * 0.6) + (n.kind === 'elite' ? 1 : 0);
+      n.level = base + Math.floor(n.col * 0.6) + (n.kind === 'elite' ? 0 : 0);
     }
     if (n.kind === 'event') n.event = events.length ? events.pop()!.id : undefined;
     if (n.kind === 'event' && !n.event) n.kind = 'fight', n.encounter = pickEnc(pools.fight), n.level = base + Math.floor(n.col * 0.6);

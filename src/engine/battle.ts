@@ -150,12 +150,17 @@ export function heroCombatant(s: BattleState | null, m: PartyMember, run: Run | 
   };
 }
 
+/** Global enemy tuning knobs (applied on top of the data tables and the level scaling). */
+export const ENEMY_TUNE = { hp: 1.75, atk: 1.5, def: 1.25, elite: 0.85, hpPerLevel: 0.12, atkPerLevel: 0.07, defPerLevel: 0.05 };
+
 export function enemyCombatant(s: BattleState, defId: string, level: number, summoned = false): Combatant {
   const d = ENEMIES[defId];
   if (!d) throw new Error('unknown enemy ' + defId);
   const L = Math.max(1, level);
-  const hpMult = 1 + 0.12 * (L - 1), atkMult = 1 + 0.07 * (L - 1);
-  const base: Stats = { ...d.stats, hp: Math.round(d.stats.hp * hpMult), atk: Math.round(d.stats.atk * atkMult), mag: Math.round(d.stats.mag * atkMult), def: Math.round(d.stats.def * (1 + 0.05 * (L - 1))), res: Math.round(d.stats.res * (1 + 0.05 * (L - 1))) };
+  const T = ENEMY_TUNE;
+  const em = d.elite ? T.elite : 1;
+  const hpMult = em * T.hp * (1 + T.hpPerLevel * (L - 1)), atkMult = em * T.atk * (1 + T.atkPerLevel * (L - 1)), defMult = T.def * (1 + T.defPerLevel * (L - 1));
+  const base: Stats = { ...d.stats, hp: Math.round(d.stats.hp * hpMult), atk: Math.round(d.stats.atk * atkMult), mag: Math.round(d.stats.mag * atkMult), def: Math.round(d.stats.def * defMult), res: Math.round(d.stats.res * defMult) };
   const n = s.enemies.filter((e) => e.def === defId).length;
   const suffix = n ? ' ' + String.fromCharCode(65 + n) : '';
   const c: Combatant = {
@@ -291,7 +296,7 @@ function heroAct(s: BattleState, c: Combatant, a: BattleAction, grades: Grade[])
     const repeat = key === s.lastCommand;
     s.lastCommand = key;
     if (repeat) for (const e of rehearsedFoes(s)) {
-      const back = Math.max(1, Math.round(eff(e, 'atk') * 0.6));
+      const back = Math.max(1, Math.round(eff(e, 'atk') * 0.4));
       c.hp = Math.max(0, c.hp - back);
       emit(s, { kind: 'msg', text: `"I know." ${e.name} was ready for that.` });
       emit(s, { kind: 'counter', who: e.id, target: c.id, dmg: back });
