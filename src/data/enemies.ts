@@ -45,7 +45,7 @@ defineEnemies([
     pattern: ['swell', 'spores', 'deflate'], xp: 7, gold: 5,
   },
   {
-    id: 'a1_murkwing', name: 'Murkwing', size: 'small', sprite: 'mon_moth_green', stats: S(32, 9, 12, { res: 6 }),
+    id: 'a1_murkwing', name: 'Murkwing', size: 'small', sprite: 'mon_moth_grey', stats: S(32, 9, 12, { res: 6 }),
     desc: 'A grey moth that flies toward the bite in the sun the way other moths fly toward porches.',
     weak: ['pierce', 'spirit'], resist: ['blunt', 'frost'], breakMax: 3, summonCap: 2,
     intents: [I('flutter', 'buff', 'Flutter', 'e_flutter'), I('dim', 'debuff', 'Dim', 'e_weaken'), I('eat', 'debuff', 'Eat the Light', 'e_eat_light')],
@@ -80,7 +80,7 @@ defineEnemies([
     pattern: ['stare', 'flail', 'crows'], xp: 9, gold: 8,
   },
   {
-    id: 'a1_toll_goat', name: 'Toll Goat', size: 'medium', sprite: 'mon_bison', stats: S(58, 12, 8, { def: 7 }),
+    id: 'a1_toll_goat', name: 'Toll Goat', size: 'medium', sprite: 'mon_goat', stats: S(58, 12, 8, { def: 7 }),
     desc: 'Member of the Billy Brotherhood. Knows every bridge bylaw and finds them delicious.',
     weak: ['slash', 'frost'], resist: ['blunt', 'spirit'], breakMax: 4, summonCap: 1,
     intents: [I('bylaws', 'debuff', 'Cite the Bylaws', 'e_expose'), I('headbutt', 'attack', 'Headbutt', 'e_bash'), I('horns', 'charge', 'Lower Horns', 'e_charge'), I('gore', 'heavy', 'Gore', 'e_gore')],
@@ -140,7 +140,7 @@ defineEnemies([
     xp: 40, gold: 45, drops: ['w_cheese_mallet', 't_goat_bell'],
   },
   {
-    id: 'a1_colossus', name: 'The Conserve Colossus', size: 'large', sprite: 'mon_boss_gourd', elite: true, stats: S(180, 15, 6, { def: 9, mag: 10, res: 6 }),
+    id: 'a1_colossus', name: 'The Conserve Colossus', size: 'large', sprite: 'mon_jam_colossus', elite: true, stats: S(180, 15, 6, { def: 9, mag: 10, res: 6 }),
     desc: 'Thirty-seven years ago it was an orchard\'s worth of strawberries. It has not forgiven anyone. A hill of jam wearing a few trees.',
     weak: ['frost', 'fire'], resist: ['slash', 'blunt'], breakMax: 7,
     intents: [I('bubble', 'buff', 'Bubble', 'e_buff_def'), I('spread', 'summon', 'Spread Thin', 'e_spread_thin'), I('wave', 'multi', 'Wave of Jam', 'e_wave_of_jam'), I('set', 'charge', 'Set', 'e_charge'), I('seal', 'heavy', 'Seal the Jar', 'e_seal_jar')],
@@ -158,7 +158,7 @@ defineEnemies([
 
   // ================================================================ boss: one enemy, three shapes
   {
-    id: 'a1_thief', name: 'The Hooded Thief, Mounted', size: 'large', sprite: 'mon_boss_bee_queen', boss: true, stats: S(230, 16, 8, { def: 9, res: 9, mag: 12 }),
+    id: 'a1_thief', name: 'The Hooded Thief, Mounted', size: 'large', sprite: 'mon_boss_moth_rider', boss: true, stats: S(230, 16, 8, { def: 9, res: 9, mag: 12 }),
     desc: 'An enormous grey moth with a hooded figure clinging to its back, shrieking. The rider throws things. One of them is a sandwich.',
     weak: ['fire', 'pierce'], resist: ['frost', 'blunt'], breakMax: 8,
     intents: [
@@ -176,12 +176,12 @@ defineEnemies([
     phases: [
       {
         onBreak: true, hpBelow: 0.6, pattern: ['proc_4b', 'odo_pole', 'speech', 'faint', 'due'], breakMax: 4, breakLock: 2,
-        name: 'Lamplighter Odo Brassfinch', sprite: 'mon_armor_blob', size: 'medium', weak: ['spirit', 'blunt'], resist: ['slash', 'pierce'], immune: [],
+        name: 'Lamplighter Odo Brassfinch', sprite: 'mon_odo', size: 'medium', weak: ['spirit', 'blunt'], resist: ['slash', 'pierce'], immune: [],
         message: "The moth spirals into the trees. The rider tumbles into a fern, the hood falls back, and it is Lamplighter Odo Brassfinch, still clutching the reliquary. He gets up. 'Procedure 1: Nobody Saw That.'",
       },
       {
         onBreak: true, hpBelow: 0.35, pattern: ['dust', 'wingstorm', 'odo_protect', 'eat_all', 'eclipse', 'eclipse', 'totality'], breakMax: 7, heal: 0.5,
-        name: 'The Duskmother, Hushed', sprite: 'mon_dragon_purple', size: 'large', weak: ['fire', 'spirit'], resist: ['slash', 'frost'], immune: [],
+        name: 'The Duskmother, Hushed', sprite: 'mon_boss_duskmother', size: 'large', weak: ['fire', 'spirit'], resist: ['slash', 'frost'], immune: [],
         message: 'The reliquary falls. The Coal bounces twice. A flake of black paint peels off grey papier-mâché. Odo sits down in the fern. Then the trees start to shake.',
       },
     ],

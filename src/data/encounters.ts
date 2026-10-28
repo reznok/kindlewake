@@ -31,7 +31,7 @@ defineEncounters([
   { id: 'a1_duskedge', tier: 1, cols: [4, 5], enemies: E('a1_snuffer', 'a1_sheetling', 'a1_murkwing'), background: 'bg_forest' },
   // Bigwigs
   { id: 'a1_elite_baron', tier: 1, elite: true, enemies: E('a1_baron', 'a1_toll_goat'), background: 'bg_bridge', intro: 'Bylaw one: the toll. Bylaw two: see bylaw one.' },
-  { id: 'a1_elite_colossus', tier: 1, elite: true, enemies: E('a1_colossus'), background: 'bg_autumn_red', intro: 'The jam regards you. The jam has always regarded you.' },
+  { id: 'a1_elite_colossus', tier: 1, elite: true, enemies: E('a1_colossus'), background: 'bg_meadow', intro: 'The jam regards you. The jam has always regarded you.' },
   { id: 'a1_elite_nocturne', tier: 1, elite: true, enemies: E('a1_nocturne', 'a1_snuffer'), background: 'bg_forest', intro: '"You always open with that."' },
   // boss
   { id: 'a1_boss', tier: 1, boss: true, enemies: E('a1_thief'), background: 'bg_jungle', intro: 'Duskwood. Something enormous and grey is circling, and somebody on its back is screaming.' },

@@ -18,7 +18,9 @@ The in-game Credits sheet reads `src/ui/credits.ts`; keep it in step with this t
 | File(s) | Packs inside | Licence |
 |---|---|---|
 | `public/atlas.png` / `.json` (heroes) | Tiny Tactics - Battle Kit I (Barty, Roz); Samurai, Ninja, Classic Pirate Captain, Mechanic, Ranger by DezrasDragons (Clem, Dell, Gertie, Kit, Pell); Classic Knight by Disthron (Ashlar). Recoloured / tinted. | CC0 |
-| `public/atlas.png` (portraits `por_*`) | Cute Heroes, Justin Nichol (warrior, assassin, cleric, paladin, bard, artificer, rogue, wizard), background removed, 96 px | **CC-BY 4.0** |
+| `public/atlas.png` (portraits `por_*`) | Framed busts built from the hero battlers above (`bust` in `tools/build-atlas.mjs`) | CC0 |
+| `public/atlas.png` (act-1 boss `mon_boss_moth_rider`, `mon_odo`) | Mr. Necromancer Man (rider) and Musketeer Officer (Odo) by Disthron, recoloured, over a 50+ Monsters moth | CC0 |
+| `public/atlas.png` (`mon_jam_colossus` trees) | Kenney Tiny Town (tree tiles over a colourful-slimes blob) | CC0 |
 | `public/atlas.png` (enemies `mon_*`) | 50+ Monsters Pack 2D; Tiny Creatures; 32x32 colorful slimes; Spring Monster Pack; Plant and Mushroom Enemies; Kica's Enemy Pack | CC0 |
 | `public/atlas.png` (enemies `mon_*`) | 10 Fantasy RPG enemies (Antifarea); RPG Enemies: 11 Dragons (Redshrike, Surt, Blarumyrran); Boss Cohort (Gilgaphoenixignis) | **CC-BY 3.0 / 4.0** |
 | `public/atlas.png` (`icon_*`) | Original glyphs drawn for this project (`tools/build-icons.mjs`) | CC0 (ours) |
@@ -35,7 +37,7 @@ The in-game Credits sheet reads `src/ui/credits.ts`; keep it in step with this t
 
 | Pack | Author | Licence | URL | Used for |
 |---|---|---|---|---|
-| Cute Heroes (16 classes) | Justin Nichol | CC-BY 4.0 (also CC-BY 3.0) | https://opengameart.org/content/cute-heroes | Hero portraits (party sheet, roster pick) |
+| Cute Heroes (16 classes) | Justin Nichol | CC-BY 4.0 (also CC-BY 3.0) | https://opengameart.org/content/cute-heroes | Not shipped (portraits are now busts of the battlers); kept for reference |
 | Cute Boss Monsters | Justin Nichol | CC-BY 4.0 (also CC-BY 3.0) | https://opengameart.org/content/cute-boss-monsters | Boss and elite battlers, bestiary |
 | Cute Monsters A-E, F-O, P-Z | Justin Nichol | CC-BY 4.0 (also CC-BY 3.0) | https://opengameart.org/content/cute-monsters-a-e , https://opengameart.org/content/cute-monsters-f-o , https://opengameart.org/content/cute-monsters-p-z | Enemy battlers (static), bestiary |
 | Cute NPCs | Justin Nichol | CC-BY 4.0 (also CC-BY 3.0) | https://opengameart.org/content/cute-npcs | Event / shop portraits |
@@ -59,7 +61,7 @@ The in-game Credits sheet reads `src/ui/credits.ts`; keep it in step with this t
 |---|---|---|---|---|
 | Ninja Adventure (GitHub demo subset only: 4 characters, 4 tracks, tilesets) | Pixel-Boy, AAA | CC0 (itch.io page; the GitHub repo carries no licence file) | https://pixel-boy.itch.io/ninja-adventure-asset-pack , https://github.com/pixel-boy/NinjaAdventure | Reference / optional tracks; full pack needs manual download |
 | Kenney Tiny Dungeon | Kenney | CC0 | https://kenney.nl/assets/tiny-dungeon | Hero and monster tiles (16px), items |
-| Kenney Tiny Town | Kenney | CC0 | https://kenney.nl/assets/tiny-town | Town / meadow / forest backdrop tiles |
+| Kenney Tiny Town | Kenney | CC0 | https://kenney.nl/assets/tiny-town | Map backdrop tile; trees on one atlas battler |
 | Kenney Tiny Battle | Kenney | CC0 | https://kenney.nl/assets/tiny-battle | Map-node and unit icons |
 | Kenney Roguelike Characters | Kenney | CC0 | https://kenney.nl/assets/roguelike-characters | Modular 16px hero builder |
 | Kenney Roguelike RPG Pack | Kenney | CC0 | https://kenney.nl/assets/roguelike-rpg-pack | Overworld / dungeon tiles |

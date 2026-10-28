@@ -11,6 +11,8 @@ Each sprite sits in a logical cell, standing on the cell's bottom edge: **small*
 grows with the box. "Art" is the drawn size inside the cell (pixel art is stored at native resolution and scaled up 2x-6x
 nearest-neighbour; painted packs are pre-shrunk and drawn smooth). Enemies face **right**, heroes face **left**.
 Single-frame enemies get a code-driven breathe, a white flash on hit and a fade on KO; heroes have real frames.
+Composite battlers use the manifest's `scale` (integer pre-upscale), `overlay` (stack more art on top or `under`) and
+`tint` ops; see the header of `tools/build-atlas.mjs`.
 
 ## Heroes (idle / attack / hurt / ko / cast)
 
@@ -26,10 +28,12 @@ Single-frame enemies get a code-driven breathe, a white flash on hit and a fade 
 | `hero_roz` | Tiny Tactics mage | cobalt robe recolour, pointed hat (3x) |
 
 `ko` reuses the hurt frame; the view tips the actor over and greys it. `cast` is a charge pose (Tiny Tactics) or a
-victory / idle pose. Portraits `por_<id>` (96 px, Cute Heroes, CC-BY): barty warrior, dell assassin, clem cleric, ashlar
-paladin, gertie bard, kit artificer, pell rogue, roz wizard. Any key not in the atlas falls back to the placeholder shape.
+victory / idle pose. Portraits `por_<id>` (96 px, px 1) are framed busts cut from the battler's own idle frame 0 (top
+~80% of the figure, 60% for the taller Tiny Tactics pair), nearest-upscaled 4x-6x, head-centred, on a banded backdrop in
+the hero's role colour with a role-colour rim (`bust` op in the manifest), so portrait and battler always agree.
+Any key not in the atlas falls back to the placeholder shape.
 
-## Enemies (150)
+## Enemies (155)
 
 | Key | Looks like | Size | Art (px) | Pack |
 |---|---|---|---|---|
@@ -48,12 +52,12 @@ paladin, gertie bard, kit artificer, pell rogue, roz wizard. Any key not in the 
 | `mon_crystal_purple` | cluster of purple crystals | medium | 112x88 | 50+ Monsters |
 | `mon_crystal_red` | cluster of red crystals | medium | 112x88 | 50+ Monsters (alt palette) |
 | `mon_bat` | grey-brown bat, wings spread | medium | 94x56 | 50+ Monsters (alt palette) |
-| `mon_firefly` | red-and-black firefly bug with a glowing tail | medium | 82x98 | 50+ Monsters |
+| `mon_firefly` | red-and-black firefly bug with a glowing tail | small | 62x74 | 50+ Monsters |
 | `mon_sheep` | fluffy white sheep | medium | 92x68 | 50+ Monsters |
 | `mon_seedling` | tiny green seed sprout | small | 54x69 | 50+ Monsters |
 | `mon_fox` | orange fox with a leafy tail | medium | 100x104 | 50+ Monsters |
 | `mon_fuzzball_blue` | blue fuzzball | small | 56x50 | 50+ Monsters |
-| `mon_snail` | pink-shelled snail | small | 64x60 | 50+ Monsters (alt palette) |
+| `mon_snail` | pink-shelled snail | medium | 128x120 | 50+ Monsters (alt palette) |
 | `mon_ghost_candle` | melting candle ghost | medium | 56x96 | 50+ Monsters |
 | `mon_owl` | big brown owl | medium | 126x100 | 50+ Monsters |
 | `mon_puffer_mine` | spiky grey puffer / sea mine | medium | 86x90 | 50+ Monsters |
@@ -84,7 +88,7 @@ paladin, gertie bard, kit artificer, pell rogue, roz wizard. Any key not in the 
 | `mon_wisp_white` | white ghost wisp with a curly tail | medium | 94x88 | 50+ Monsters |
 | `mon_octopus_green` | green octopus | medium | 96x78 | 50+ Monsters |
 | `mon_bird` | brown sparrow | medium | 88x80 | 50+ Monsters |
-| `mon_crow` | black crow | medium | 88x80 | 50+ Monsters (alt palette) |
+| `mon_crow` | black crow | small | 66x60 | 50+ Monsters (alt palette) |
 | `mon_alien_blob` | tiny green alien blob with antennae | small | 54x56 | 50+ Monsters |
 | `mon_spider` | small grey spider | small | 64x36 | 50+ Monsters |
 | `mon_sea_slug` | red-orange sea slug | medium | 90x84 | 50+ Monsters |
@@ -118,7 +122,7 @@ paladin, gertie bard, kit artificer, pell rogue, roz wizard. Any key not in the 
 | `mon_scorpion` | red scorpion | medium | 82x114 | 10 Fantasy RPG Enemies (CC-BY) |
 | `mon_wolf` | grey wolf | medium | 94x110 | 10 Fantasy RPG Enemies (CC-BY) |
 | `mon_wolf_red` | russet wolf | medium | 94x110 | 10 Fantasy RPG Enemies (CC-BY) |
-| `mon_ghost` | white sheet ghost | medium | 110x92 | 10 Fantasy RPG Enemies (CC-BY) |
+| `mon_ghost` | white sheet ghost | small | 69x58 | 10 Fantasy RPG Enemies (CC-BY) |
 | `mon_dragon_green` | chubby green dragon, wings spread (front) | large | 196x140 | 10 Fantasy RPG Enemies (CC-BY) |
 | `mon_dragon_red` | chubby red dragon, wings spread (front) | large | 196x140 | 10 Fantasy RPG Enemies (CC-BY) |
 | `mon_dragon_purple` | chubby purple dragon, wings spread (front) | large | 196x140 | 10 Fantasy RPG Enemies (CC-BY) |
@@ -152,7 +156,7 @@ paladin, gertie bard, kit artificer, pell rogue, roz wizard. Any key not in the 
 | `mon_treant` | walking tree | medium | 96x96 | Tiny Creatures |
 | `mon_eagle` | brown eagle | medium | 96x96 | Tiny Creatures |
 | `mon_chicken` | white chicken | small | 70x60 | Tiny Creatures |
-| `mon_goat` | white goat | small | 80x80 | Tiny Creatures |
+| `mon_goat` | white goat | medium | 96x96 | Tiny Creatures |
 | `mon_bee_knight` | armoured bee knight with a lance | medium | 119x76 | Spring Monster Pack |
 | `mon_boss_bee_queen` | queen bee knight with a honey lance (boss) | large | 169x121 | Spring Monster Pack |
 | `mon_bunny` | pink long-eared bunny | medium | 109x115 | Spring Monster Pack |
@@ -183,6 +187,11 @@ paladin, gertie bard, kit artificer, pell rogue, roz wizard. Any key not in the 
 | `mon_boss_elephant` | hunched brown bestiary elephant, bear-like (boss) | large | 168x120 | Boss Cohort (CC-BY) |
 | `mon_boss_terra` | tangled green-brown earth demon (boss) | large | 154x172 | Boss Cohort (CC-BY) |
 | `mon_boss_spectre` | gentleman spectre in a top hat (boss) | large | 90x181 | Boss Cohort (CC-BY) |
+| `mon_moth_grey` | grey moth (the leaf moth, tinted) | small | 66x60 | 50+ Monsters (tinted) |
+| `mon_boss_moth_rider` | enormous grey moth with a small brown-hooded rider on its head | large | 198x180 | 50+ Monsters moth (2x, tinted) + Mr. Necromancer Man (recoloured) |
+| `mon_odo` | official in mustard-and-brass livery, plumed hat, sword at his side | medium | 96x126 | Musketeer Officer (Disthron, recoloured) |
+| `mon_boss_duskmother` | huge dusk-blue grey moth, no rider | large | 198x180 | 50+ Monsters moth (3x, tinted) |
+| `mon_jam_colossus` | hill of red jam with a face, three little trees growing out of its top | large | 152x196 | Colorful Slimes blob (3x, tinted) + Kenney Tiny Town trees |
 
 ## UI glyphs (12 px, `icon_<name>`, original art in tools/build-icons.mjs)
 

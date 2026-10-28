@@ -17,6 +17,16 @@
  *     tint: "rrggbb"           greyscale then multiply (stone / statue looks)
  *     bright: [brightness, saturation]   e.g. [1.08, 1.25]
  *     flip: true               mirror horizontally (atlas frames face the side's canonical direction)
+ *     scale: n                 nearest-neighbour upscale of the source by an integer (after shrink, before keying)
+ *     overlay: [ Overlay ]     composite more art onto every frame (after the base's key / recolour / tint):
+ *                              { "src", "dir"?, "dx", "dy", "scale"?, "flip"?, "under"?, bgKey/tol/recolor/tint/bright }
+ *                              dx, dy place the overlay's top-left relative to the base frame's opaque box (source px,
+ *                              after the base's scale); the canvas grows to fit; under: true draws it behind the base
+ *     bust: { "from": key, "rows"?: 0.8, "scale"?: n, "bg": ["rrggbb", "rrggbb"], "rim": "rrggbb", "edge"?: "rrggbb",
+ *             "headRows"?: 8 }
+ *                              framed portrait (portrait size, px 1): the top `rows` of key's processed idle frame 0,
+ *                              nearest-upscaled (scale default: the largest integer that fits), centred on the head,
+ *                              standing on the frame's bottom edge, over a banded bg[0]->bg[1] backdrop with a rim
  *     cell: [w, h]             logical cell in display px; size: small|medium|large picks 80/128/200 squares
  *     px: n | "auto"           display pixel scale (atlas stays at native res; the game draws px times bigger);
  *                              auto = integer fit from 2x up, quarter steps between 1x and 2x, area-downscale below 1x
@@ -43,7 +53,11 @@ const cache = new Map();
 function load(file) {
   if (!cache.has(file)) {
     if (!fs.existsSync(file)) throw new Error('missing source: ' + file);
-    cache.set(file, PNG.sync.read(fs.readFileSync(file)));
+    // some packs (Dungeon Crawl tiles) carry junk after IEND; cut it off
+    let buf = fs.readFileSync(file);
+    const end = buf.indexOf('IEND');
+    if (end > 0) buf = buf.subarray(0, end + 8);
+    cache.set(file, PNG.sync.read(buf));
   }
   return cache.get(file);
 }
@@ -143,6 +157,99 @@ function shrink(img, k) {
   return out;
 }
 
+/** Nearest upscale by an integer factor. */
+function grow(img, k) {
+  if (!k || k === 1) return img;
+  const out = new PNG({ width: img.width * k, height: img.height * k });
+  for (let y = 0; y < out.height; y++) for (let x = 0; x < out.width; x++) {
+    const si = (Math.floor(y / k) * img.width + Math.floor(x / k)) * 4, di = (y * out.width + x) * 4;
+    for (let c = 0; c < 4; c++) out.data[di + c] = img.data[si + c];
+  }
+  return out;
+}
+
+/** Alpha-blend src onto dst at (x, y). */
+function blit(src, dst, x, y) {
+  for (let sy = 0; sy < src.height; sy++) for (let sx = 0; sx < src.width; sx++) {
+    const dx = x + sx, dy = y + sy;
+    if (dx < 0 || dy < 0 || dx >= dst.width || dy >= dst.height) continue;
+    const s = (sy * src.width + sx) * 4, d = (dy * dst.width + dx) * 4, a = src.data[s + 3] / 255;
+    if (!a) continue;
+    const da = dst.data[d + 3] / 255, oa = a + da * (1 - a);
+    for (let k = 0; k < 3; k++) dst.data[d + k] = Math.round((src.data[s + k] * a + dst.data[d + k] * da * (1 - a)) / oa);
+    dst.data[d + 3] = Math.round(oa * 255);
+  }
+}
+
+/** Composite overlays onto a processed frame; the canvas grows to fit them. */
+function applyOverlays(img, o, dir) {
+  if (!o.overlay?.length) return img;
+  const b = bbox(img) ?? { x: 0, y: 0, w: img.width, h: img.height };
+  const parts = o.overlay.map((ov) => {
+    const [s] = expand(ov.src, ov.dir ?? dir);
+    let im = grow(crop({ ...s, file: resolveDir(s.file) }), ov.scale);
+    colorKey(im, ov);
+    recolor(im, ov);
+    if (ov.flip) im = flipX(im);
+    return { im, x: b.x + (ov.dx ?? 0), y: b.y + (ov.dy ?? 0), under: !!ov.under };
+  });
+  const x0 = Math.min(0, ...parts.map((p) => p.x)), y0 = Math.min(0, ...parts.map((p) => p.y));
+  const x1 = Math.max(img.width, ...parts.map((p) => p.x + p.im.width)), y1 = Math.max(img.height, ...parts.map((p) => p.y + p.im.height));
+  const out = new PNG({ width: x1 - x0, height: y1 - y0 });
+  out.data.fill(0);
+  for (const p of parts) if (p.under) blit(p.im, out, p.x - x0, p.y - y0);
+  blit(img, out, -x0, -y0);
+  for (const p of parts) if (!p.under) blit(p.im, out, p.x - x0, p.y - y0);
+  return out;
+}
+
+/** A framed portrait bust from another sprite's processed idle frame (see the header). */
+function makeBust(o, cell) {
+  const spec = o.bust;
+  const srcSprite = built.get(spec.from);
+  if (!srcSprite) throw new Error(`${o.key}: bust source ${spec.from} not built yet (list it earlier in the manifest)`);
+  let base = srcSprite.list.find((f) => f.anim === 'idle' && f.i === 0)?.img ?? srcSprite.list[0].img;
+  if (srcSprite.o.flip) base = flipX(base);
+  const b = bbox(base);
+  const rows = Math.max(1, Math.round(b.h * (spec.rows ?? 0.8)));
+  // centre on the head: mean opaque column over the top few rows (weapons skew the full box)
+  const headRows = spec.headRows ?? Math.max(4, Math.round(b.h * 0.3));
+  let sum = 0, n = 0;
+  for (let y = b.y; y < b.y + headRows; y++) for (let x = b.x; x < b.x + b.w; x++) if (base.data[(y * base.width + x) * 4 + 3] > 8) { sum += x; n++; }
+  const cx = n ? sum / n : b.x + b.w / 2;
+  const [W, H] = cell;
+  const k = spec.scale ?? Math.max(1, Math.min(spec.maxScale ?? 6, Math.floor((H - 12) / rows)));
+  const part = sub(base, { x: b.x, y: b.y, w: b.w, h: rows });
+  const big = grow(part, k);
+  const out = new PNG({ width: W, height: H });
+  out.data.fill(0);
+  // backdrop: banded vertical gradient inside a rounded rim
+  const [ta, tb] = (spec.bg ?? ['ffffff', 'cccccc']).map(hex), rim = hex(spec.rim ?? '888888'), edge = hex(spec.edge ?? '1e1a2e');
+  const bands = 6, R = 6;
+  const inside = (x, y, inset) => {
+    const l = inset, t = inset, r = W - 1 - inset, bt = H - 1 - inset, rr = Math.max(0, R - inset);
+    if (x < l || y < t || x > r || y > bt) return false;
+    const qx = x < l + rr ? l + rr : x > r - rr ? r - rr : x, qy = y < t + rr ? t + rr : y > bt - rr ? bt - rr : y;
+    return (x - qx) ** 2 + (y - qy) ** 2 <= rr * rr + 0.5;
+  };
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = (y * W + x) * 4;
+    let c = null;
+    if (inside(x, y, 3)) { const t = Math.min(bands - 1, Math.floor((y / H) * bands)) / (bands - 1); c = ta.map((v, j) => Math.round(v + (tb[j] - v) * t)); }
+    else if (inside(x, y, 1)) c = rim;
+    else if (inside(x, y, 0)) c = edge;
+    if (c) { out.data[i] = c[0]; out.data[i + 1] = c[1]; out.data[i + 2] = c[2]; out.data[i + 3] = 255; }
+  }
+  // the bust stands on the inner bottom edge, head-centred; clip to the inner area
+  const px0 = Math.round(W / 2 - (cx - b.x + 0.5) * k), py0 = H - 3 - big.height;
+  const clip = new PNG({ width: W, height: H });
+  clip.data.fill(0);
+  blit(big, clip, px0, py0);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (!inside(x, y, 3)) clip.data[(y * W + x) * 4 + 3] = 0;
+  blit(clip, out, 0, 0);
+  return out;
+}
+
 function flipX(img) {
   const out = new PNG({ width: img.width, height: img.height });
   for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++) {
@@ -190,6 +297,7 @@ function resample(img, W, H) {
 
 const frames = []; // { key, img, ox, oy, px }
 const spritesIdx = {};
+const built = new Map(); // key -> { o, list } processed frames, for busts
 
 // { "glob": "dir", "prefix": "icon_", ...ops } adds one sprite per PNG in dir
 const spriteList = (manifest.sprites ?? []).flatMap((s) => {
@@ -206,6 +314,11 @@ for (const raw of spriteList) {
   const o = { ...(manifest.groups?.[raw.group] ?? {}), ...raw };
   const dir = o.dir ?? '';
   const cell = o.cell ?? SIZES[o.size ?? 'medium'];
+  if (o.bust) {
+    frames.push({ key: `${o.key}:idle:0`, img: makeBust(o, cell), ox: 0, oy: 0, px: 1 });
+    spritesIdx[o.key] = { face: 0, cw: cell[0], ch: cell[1], anims: { idle: 1 } };
+    continue;
+  }
   const anims = o.anims ?? { idle: [o.src] };
   // load + process every frame
   const list = [];
@@ -214,11 +327,14 @@ for (const raw of spriteList) {
     exp.forEach((s, i) => {
       let img = crop({ ...s, file: resolveDir(s.file) });
       if (o.shrink) img = shrink(img, o.shrink);
+      img = grow(img, o.scale);
       colorKey(img, o);
       recolor(img, o);
+      img = applyOverlays(img, o, dir);
       list.push({ anim, i, img });
     });
   }
+  built.set(o.key, { o, list });
   // pixel scale: from the anchor frame's opaque box (single-frame sprites are trimmed to their art)
   const anchor = list[Math.min(o.anchor ?? 0, list.length - 1)];
   const ab = bbox(anchor.img) ?? { x: 0, y: 0, w: anchor.img.width, h: anchor.img.height };
