@@ -23,9 +23,9 @@ export const STATUSES: Record<StatusId, StatusDef> = {
   regen: { id: 'regen', name: 'Regen', color: '#8fdf7a', bad: false, desc: 'Recovers 8% HP each turn.', tick: -8 },
   barrier: { id: 'barrier', name: 'Barrier', color: '#9cc8ff', bad: false, desc: 'Absorbs damage until it pops.' },
   atkUp: { id: 'atkUp', name: 'Might', color: '#ff9a5c', bad: false, desc: 'Deals 30% more damage.', mods: { atk: 1.3, mag: 1.3 } },
-  atkDown: { id: 'atkDown', name: 'Weak', color: '#c9a0ff', bad: true, desc: 'Deals 30% less damage.', mods: { atk: 0.7, mag: 0.7 } },
+  atkDown: { id: 'atkDown', name: 'Feeble', color: '#c9a0ff', bad: true, desc: 'Deals 30% less damage.', mods: { atk: 0.7, mag: 0.7 } },
   defUp: { id: 'defUp', name: 'Stone', color: '#d8c8a0', bad: false, desc: 'Takes 30% less damage.', mods: { def: 1.4, res: 1.4 } },
-  defDown: { id: 'defDown', name: 'Cracked', color: '#ff8a8a', bad: true, desc: 'Takes 30% more damage.', mods: { def: 0.6, res: 0.6 } },
+  defDown: { id: 'defDown', name: 'Soft', color: '#ff8a8a', bad: true, desc: 'Takes 30% more damage.', mods: { def: 0.6, res: 0.6 } },
   haste: { id: 'haste', name: 'Haste', color: '#fff0a0', bad: false, desc: 'Acts 40% faster.', mods: { spd: 1.4 } },
   slow: { id: 'slow', name: 'Slow', color: '#a0a0c0', bad: true, desc: 'Acts 40% slower.', mods: { spd: 0.6 } },
 };

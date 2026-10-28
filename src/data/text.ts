@@ -101,8 +101,8 @@ export const TAGLINES: { always: string[]; gated: { seen: string; lines: string[
 };
 
 export const TIPS: string[] = [
-  'Tap as the ring closes. A Bright hit on a weakness wobbles a Set twice.',
-  "A Cracked foe has to remember what it is. Hit it while it's remembering.",
+  'Tap as the ring closes. A Bright hit on a weakness takes two off the Break bar.',
+  "A Broken foe has to remember what it is. Hit it while it's remembering.",
   'Push a Cracked foe\'s turn back and it stays Cracked longer.',
   'Heavy and charge intents are the ones to Crack, or to Guard.',
   'A Steady guard restores Moxie. Nothing restores your nerve like a goat bouncing off a skillet lid.',
@@ -178,6 +178,22 @@ export const CAMP_SCENES: CampScene[] = [
       { who: 'barty', text: '"Everyone does."', requires: ['ashlar'] },
       { who: 'ashlar', text: '"Not at that length."', requires: ['barty'] },
       { who: 'dell', text: '"Bed. We have a moth to catch."' },
+    ],
+  },
+  {
+    // Fallback: plays for any party (no `requires`), so a camp is never silent.
+    id: 'fireside_kettle', title: 'The Kettle', cols: [0, 5],
+    lines: [
+      { who: null, text: 'Somebody finds the kettle. Somebody else finds the water. Nobody finds the tea, and then everybody does, in the Wagon, under the maps.' },
+      { who: 'barty', text: '"I brought scones. I always bring scones. One day someone will say thank you for the scones."' },
+      { who: 'dell', text: '"Thank you for the scones." A pause. "Seven out of twenty."' },
+      { who: 'clem', text: '"The girls are asleep in the hive. They did good work today. Say it so they can hear."' },
+      { who: 'roz', text: '"Pressure is dropping. Tomorrow will be fine, or terrible, or both. I keep telling people this and they keep going outside."' },
+      { who: 'ashlar', text: '"I do not sleep. I will watch the fire. I have watched a great many fires. This one is small but sincere."' },
+      { who: 'gertie', text: '"GOODNIGHT, EVERYONE." A long pause. "GOODNIGHT, FIRE."' },
+      { who: 'kit', text: 'Kit has taken the kettle apart. It is a better kettle now, apparently. It whistles the Proclamation.' },
+      { who: 'pell', text: 'Pell mimes putting the whole fire into her pocket for later, then mimes that it is warm in there, then mimes *sorry*.' },
+      { who: null, text: 'The fire does the thing fires do, which is look like it knows something. Nobody asks it.' },
     ],
   },
 ];
@@ -334,7 +350,7 @@ export const GLOSSARY: Record<string, { term: string; meaning: string; ui?: stri
   trinket: { term: 'Knick-knack', meaning: 'trinket slot' },
   gold: { term: 'buttons', meaning: 'gold', ui: '"120 buttons"' },
   mp: { term: 'Moxie', meaning: 'MP', ui: '"MX" or "MP"; tooltip "Moxie"' },
-  break: { term: 'Set / Cracked', meaning: 'Break bar / Broken', ui: '"CRACKED!" popup is optional flavour; "Break" is fine' },
+  break: { term: 'Break / Broken', meaning: 'Break bar / Broken', ui: 'The UI says BREAK and BROKEN; "Set" and "Cracked" are dialogue flavour only' },
   weakness: { term: 'Undoing', meaning: 'weakness', ui: 'Bestiary: "Undoing: Chill, Bake"' },
   perfect: { term: 'Bright', meaning: 'perfect timing', ui: '"BRIGHT!"' },
   good: { term: 'Warm', meaning: 'good timing', ui: '"Warm"' },

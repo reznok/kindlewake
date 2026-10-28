@@ -57,7 +57,8 @@ export function newRun(seed: number, starters: string[], ledger: Ledger): Run {
 export function genMap(r: Rng, act: 1 | 2 | 3, ledger: Ledger, run: Run): ActMap {
   const nodes: MapNode[] = [];
   const cols: MapNode[][] = [];
-  const counts = [2, 3, 3, 3, 3, 2, 1].map((n, i) => (i === 0 || i === COLUMNS - 1 ? n : Math.min(3, Math.max(2, n + r.int(-1, 0)))));
+  // two starts, three choices through the middle, a narrow pass before the boss (one of its two stops is a Bigwig)
+  const counts = [2, 3, 3, 3, 3, 2, 1].map((n, i) => (i === 1 || i === 2) && r.chance(0.3) ? 2 : n);
   for (let c = 0; c < COLUMNS; c++) {
     cols[c] = [];
     for (let row = 0; row < counts[c]; row++) { const n: MapNode = { id: nodes.length, col: c, row, kind: 'fight', next: [] }; nodes.push(n); cols[c].push(n); }
@@ -76,11 +77,13 @@ export function genMap(r: Rng, act: 1 | 2 | 3, ledger: Ledger, run: Run): ActMap
     }
     if (placed < count) { cand = cand.filter((n) => n.kind === 'fight'); for (let i = 0; i < count - placed && i < cand.length; i++) cand[i].kind = kind; }
   };
-  place('elite', 3, 5, 2);
-  place('shop', 3, 5, 1);
-  place('recruit', 1, 4, 2);
-  place('camp', 2, 5, r.int(1, 2));
-  place('event', 1, 5, 3, false);
+  // one Bigwig guards the pass (column 5), the other sits mid-act
+  cols[5][r.int(0, cols[5].length - 1)].kind = 'elite';
+  place('elite', 3, 4, 1);
+  place('shop', 3, 4, 1);
+  place('recruit', 1, 3, 1);
+  place('camp', 2, 4, r.int(1, 2));
+  place('event', 1, 4, 2, false);
   // edges: monotone mapping plus a random extra link, every node reachable and every node leads on
   for (let c = 0; c < COLUMNS - 1; c++) {
     const a = cols[c], b = cols[c + 1];
@@ -95,18 +98,25 @@ export function genMap(r: Rng, act: 1 | 2 | 3, ledger: Ledger, run: Run): ActMap
   // content
   const pools = { fight: encounterPool(act, 'fight'), elite: encounterPool(act, 'elite'), boss: encounterPool(act, 'boss') };
   const used = new Set<string>();
-  const pickEnc = (list: EncounterDef[]) => { const fresh = list.filter((e) => !used.has(e.id)); const e = r.pick(fresh.length ? fresh : list); used.add(e.id); return e.id; };
+  const pickEnc = (list: EncounterDef[], col: number) => {
+    const inBand = list.filter((e) => !e.cols || e.cols.includes(col));
+    const pool = inBand.length ? inBand : list;
+    const fresh = pool.filter((e) => !used.has(e.id));
+    const e = r.pick(fresh.length ? fresh : pool);
+    used.add(e.id);
+    return e.id;
+  };
   const events = r.shuffle(eventPool(act).filter((e) => !(e.once && run.flags['event:' + e.id])));
   const recruits = r.shuffle(recruitable(ledger, run, act));
   const base = [0, 1, 7, 13][act];
   for (const n of nodes) {
     if (n.kind === 'fight' || n.kind === 'elite' || n.kind === 'boss') {
       if (!pools[n.kind].length) throw new Error('no encounters for act ' + act + ' ' + n.kind);
-      n.encounter = pickEnc(pools[n.kind]);
-      n.level = base + Math.floor(n.col * 0.6) + (n.kind === 'elite' ? 0 : 0);
+      n.encounter = pickEnc(pools[n.kind], n.col);
+      n.level = base + Math.floor(n.col * 0.6);
     }
     if (n.kind === 'event') n.event = events.length ? events.pop()!.id : undefined;
-    if (n.kind === 'event' && !n.event) n.kind = 'fight', n.encounter = pickEnc(pools.fight), n.level = base + Math.floor(n.col * 0.6);
+    if (n.kind === 'event' && !n.event) n.kind = 'fight', n.encounter = pickEnc(pools.fight, n.col), n.level = base + Math.floor(n.col * 0.6);
     if (n.kind === 'recruit') { n.recruit = recruits.pop(); if (!n.recruit) { n.kind = 'camp'; } }
     if (n.kind === 'shop') n.stock = rollStock(r, act, run, ledger);
   }
@@ -244,7 +254,7 @@ export function addXp(run: Run, amount: number): string[] {
   for (const m of run.party) {
     const bench = !run.active.includes(m.id);
     const p = memberPassives(m, run);
-    const share = bench && !passivePower(p, 'benchXp') ? 0.7 : 1;
+    const share = bench && !passivePower(p, 'benchXp') ? 0.85 : 1;
     m.xp += Math.round(amount * share);
     let grew = false;
     while (m.level < MAX_LEVEL && m.xp >= xpForLevel(m.level + 1)) {
@@ -306,12 +316,19 @@ export function recruit(run: Run, accept: boolean, replace?: string): PartyMembe
     const [gone] = run.party.splice(idx, 1);
     run.active = run.active.filter((id) => id !== gone.id);
   }
-  const level = Math.max(1, Math.round(run.party.reduce((a, m) => a + m.level, 0) / Math.max(1, run.party.length)) - 1);
+  const level = recruitLevel(run);
   const m = newMember(run, def, level);
   run.party.push(m);
   if (run.active.length < ACTIVE_MAX) run.active.push(m.id);
   finishNode(run);
   return m;
+}
+
+/** New members join at the lowest level in the front line (never below 1). */
+export function recruitLevel(run: Run): number {
+  const front = run.party.filter((m) => run.active.includes(m.id));
+  const pool = front.length ? front : run.party;
+  return Math.max(1, Math.min(...pool.map((m) => m.level)));
 }
 
 export function dismiss(run: Run, memberId: string): boolean {
@@ -482,7 +499,7 @@ export function applyOutcome(run: Run, o: Outcome): boolean {
     case 'relic': if (RELICS[o.id] && !run.relics.includes(o.id) && run.relics.length < RELIC_MAX) run.relics.push(o.id); return false;
     case 'recruit': {
       if (run.party.some((m) => m.def === o.id) || run.party.length >= PARTY_MAX || !CHARACTERS[o.id]) return false;
-      const m = newMember(run, o.id, Math.max(1, Math.round(run.party.reduce((a, x) => a + x.level, 0) / run.party.length) - 1));
+      const m = newMember(run, o.id, recruitLevel(run));
       run.party.push(m);
       if (run.active.length < ACTIVE_MAX) run.active.push(m.id);
       return false;

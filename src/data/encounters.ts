@@ -14,21 +14,21 @@ const L = (level: number, ...defs: string[]) => defs.map((def) => ({ def, level 
 
 defineEncounters([
   // ---- act 1: the Marigold Downs (cols 1-2, teacher foes only)
-  { id: 'a1_jam', tier: 1, enemies: E('a1_jamble', 'a1_jamble'), background: 'bg_meadow' },
-  { id: 'a1_buzz', tier: 1, enemies: E('a1_scab_bee', 'a1_waistcoat_wasp'), background: 'bg_meadow' },
-  { id: 'a1_post', tier: 1, enemies: E('a1_runaway_kite', 'a1_cawdle'), background: 'bg_grass' },
-  { id: 'a1_dusk_early', tier: 1, enemies: E('a1_murkwing', 'a1_murkwing', 'a1_jamble'), background: 'bg_forest' },
+  { id: 'a1_jam', tier: 1, cols: [0, 1, 2], enemies: E('a1_jamble', 'a1_jamble'), background: 'bg_meadow' },
+  { id: 'a1_buzz', tier: 1, cols: [0, 1, 2], enemies: E('a1_scab_bee', 'a1_waistcoat_wasp'), background: 'bg_meadow' },
+  { id: 'a1_post', tier: 1, cols: [0, 1, 2], enemies: E('a1_runaway_kite', 'a1_cawdle'), background: 'bg_grass' },
+  { id: 'a1_dusk_early', tier: 1, cols: [0, 1, 2], enemies: E('a1_murkwing', 'a1_murkwing', 'a1_jamble'), background: 'bg_forest' },
   // cols 3-4
-  { id: 'a1_field', tier: 1, enemies: E('a1_haywarden', 'a1_cawdle'), background: 'bg_autumn' },
-  { id: 'a1_bridge', tier: 1, enemies: E('a1_toll_goat', 'a1_cawdle'), background: 'bg_bridge' },
-  { id: 'a1_topiary', tier: 1, enemies: E('a1_leafhound', 'a1_cawdle'), background: 'bg_castle' },
-  { id: 'a1_garden', tier: 1, enemies: E('a1_trundlesnail', 'a1_puffcap'), background: 'bg_meadow' },
-  { id: 'a1_picnic', tier: 1, enemies: E('a1_luncheon', 'a1_scab_bee'), background: 'bg_meadow' },
+  { id: 'a1_field', tier: 1, cols: [2, 3, 4], enemies: E('a1_haywarden', 'a1_cawdle'), background: 'bg_autumn' },
+  { id: 'a1_bridge', tier: 1, cols: [2, 3, 4], enemies: E('a1_toll_goat', 'a1_cawdle'), background: 'bg_bridge' },
+  { id: 'a1_topiary', tier: 1, cols: [2, 3, 4], enemies: E('a1_leafhound', 'a1_cawdle'), background: 'bg_castle' },
+  { id: 'a1_garden', tier: 1, cols: [2, 3, 4], enemies: E('a1_trundlesnail', 'a1_puffcap'), background: 'bg_meadow' },
+  { id: 'a1_picnic', tier: 1, cols: [2, 3, 4], enemies: E('a1_luncheon', 'a1_scab_bee'), background: 'bg_meadow' },
   // cols 5-6
-  { id: 'a1_war', tier: 1, enemies: E('a1_turnipcutter', 'a1_haywarden'), background: 'bg_autumn' },
-  { id: 'a1_sett', tier: 1, enemies: E('a1_grumbadger', 'a1_puffcap', 'a1_scab_bee'), background: 'bg_forest' },
-  { id: 'a1_snuffers', tier: 1, enemies: E('a1_snuffer', 'a1_murkwing', 'a1_murkwing'), background: 'bg_forest' },
-  { id: 'a1_duskedge', tier: 1, enemies: E('a1_snuffer', 'a1_sheetling', 'a1_murkwing'), background: 'bg_forest' },
+  { id: 'a1_war', tier: 1, cols: [4, 5], enemies: E('a1_turnipcutter', 'a1_haywarden'), background: 'bg_autumn' },
+  { id: 'a1_sett', tier: 1, cols: [4, 5], enemies: E('a1_grumbadger', 'a1_puffcap', 'a1_scab_bee'), background: 'bg_forest' },
+  { id: 'a1_snuffers', tier: 1, cols: [4, 5], enemies: E('a1_snuffer', 'a1_murkwing', 'a1_murkwing'), background: 'bg_forest' },
+  { id: 'a1_duskedge', tier: 1, cols: [4, 5], enemies: E('a1_snuffer', 'a1_sheetling', 'a1_murkwing'), background: 'bg_forest' },
   // Bigwigs
   { id: 'a1_elite_baron', tier: 1, elite: true, enemies: E('a1_baron', 'a1_toll_goat'), background: 'bg_bridge', intro: 'Bylaw one: the toll. Bylaw two: see bylaw one.' },
   { id: 'a1_elite_colossus', tier: 1, elite: true, enemies: E('a1_colossus'), background: 'bg_autumn_red', intro: 'The jam regards you. The jam has always regarded you.' },

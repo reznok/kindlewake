@@ -149,7 +149,7 @@ defineEnemies([
   },
   {
     id: 'a1_nocturne', name: 'Sister Nocturne', size: 'medium', sprite: 'mon_shade', elite: true, stats: S(150, 16, 9, { def: 8, res: 9 }),
-    desc: 'A Quiet Hour adept in a grey habit with two bell-snuffers and tired, certain eyes. Counters any command used twice in a row.',
+    desc: 'A Quiet Hour adept in a grey habit with two bell-snuffers and tired, certain eyes. Counters whoever repeats the last command anyone used (Guard and Swap do not count).',
     weak: ['storm', 'slash'], resist: ['spirit', 'blunt'], breakMax: 6, passives: [{ id: 'rehearsed' }],
     intents: [I('hush', 'debuff', 'Hush', 'e_hush'), I('twin', 'multi', 'Twin Snuff', 'e_twin_snuff'), I('lullaby', 'debuff', 'Lullaby', 'e_chill_one'), I('i_know', 'charge', 'I Know What You\'ll Do', 'e_charge'), I('not_this_time', 'heavy', 'Not This Time', 'e_not_this_time')],
     pattern: ['hush', 'twin', 'lullaby', 'i_know', 'not_this_time'],
@@ -175,7 +175,7 @@ defineEnemies([
     pattern: ['wingbeat', 'smoke', 'murk', 'sandwich', 'dive', 'swoop'],
     phases: [
       {
-        onBreak: true, hpBelow: 0.6, pattern: ['proc_4b', 'odo_pole', 'speech', 'faint', 'due'], breakMax: 4,
+        onBreak: true, hpBelow: 0.6, pattern: ['proc_4b', 'odo_pole', 'speech', 'faint', 'due'], breakMax: 4, breakLock: 2,
         name: 'Lamplighter Odo Brassfinch', sprite: 'mon_armor_blob', size: 'medium', weak: ['spirit', 'blunt'], resist: ['slash', 'pierce'], immune: [],
         message: "The moth spirals into the trees. The rider tumbles into a fern, the hood falls back, and it is Lamplighter Odo Brassfinch, still clutching the reliquary. He gets up. 'Procedure 1: Nobody Saw That.'",
       },

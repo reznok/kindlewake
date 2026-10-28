@@ -66,11 +66,11 @@ defineEvents([
   },
   {
     id: 'ev_letter', act: 1, once: true, title: 'Letter by Kite',
-    text: 'A post-kite with a red ribbon tail has snagged in a hawthorn. Its pouch holds a letter addressed *To the party, c/o the Downs*, on Kindlewake Inn notepaper, in a looping old-fashioned hand: *"Mind the goats at the bridge; the big one hates frost. Don\'t eat anything a hamper offers you. Do eat something, though. — H."* Wrapped underneath, a thick slice of fruitcake.',
+    text: 'A post-kite with a red ribbon tail has snagged in a hawthorn. Its pouch holds a letter addressed *To the party, c/o the Downs*, on Kindlewake Inn notepaper, in a looping old-fashioned hand: *"Mind the goats at the bridge; the big one hates frost. Don\'t eat anything a hamper offers you. Do eat something, though. — Nan"* Wrapped underneath, a thick slice of fruitcake.',
     choices: [
       { label: 'Eat it now.', result: 'It is the best fruitcake any of you has ever eaten. Nobody says so. Everybody knows.', outcomes: [{ kind: 'heal', pct: 25 }] },
       { label: 'Save it.', result: 'You wrap it up again, carefully.', outcomes: item('c_fruitcake') },
-      { label: 'Write back: "Who are you?"', result: 'The kite insists on a parcel, so the cake goes back with the letter. Within the hour another kite drops a jar on your heads: *"Frost-jam. Don\'t ask. — H."*', outcomes: [...item('c_snow_globe', 2), { kind: 'flag', flag: 'wrote_to_nan' }] },
+      { label: 'Write back: "Who are you?"', result: 'The kite insists on a parcel, so the cake goes back with the letter. Within the hour another kite drops a jar on your heads: *"Frost-jam. Don\'t ask. — Nan"*', outcomes: [...item('c_snow_globe', 2), { kind: 'flag', flag: 'wrote_to_nan' }] },
     ],
   },
   {

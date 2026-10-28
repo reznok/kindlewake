@@ -180,7 +180,7 @@ describe('content tables', () => {
     expect(deathQuip(shape)).toBe(DEATH_QUIPS.byKiller['a1_thief#2']);
     expect(deathQuip('the dark', (l) => l[1])).toBe(DEATH_QUIPS.general[1]);
     for (const k of Object.keys(ELITE_BARKS)) expect(ENEMIES[k]?.elite, k).toBe(true);
-    expect(CAMP_SCENES.length).toBe(2);
+    expect(CAMP_SCENES.length).toBeGreaterThanOrEqual(2);
     for (const sc of CAMP_SCENES) for (const l of sc.lines) for (const who of [l.who, ...(l.requires ?? [])]) if (who) expect(CHARACTERS[who], who).toBeTruthy();
     for (const k of Object.keys(SHOP.byMember)) expect(CHARACTERS[k]).toBeTruthy();
     expect(TIPS.length).toBe(12);

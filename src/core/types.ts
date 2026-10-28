@@ -143,6 +143,8 @@ export interface EnemyDef {
   phases?: {
     hpBelow?: number; onBreak?: boolean; pattern: string[]; message: string; heal?: number; breakMax?: number;
     name?: string; sprite?: string; size?: 'small' | 'medium' | 'large'; weak?: DamageType[]; resist?: DamageType[]; immune?: DamageType[];
+    /** The new shape cannot be chipped for this many of its own turns. */
+    breakLock?: number;
   }[];
   /** Can be summoned up to this many copies at once. */
   summonCap?: number;
@@ -154,6 +156,8 @@ export interface EncounterDef {
   id: string;
   enemies: { def: string; level?: number }[];
   tier: 1 | 2 | 3;
+  /** Map columns this pack may appear in (default: any). Early columns are teaching packs. */
+  cols?: number[];
   elite?: boolean;
   boss?: boolean;
   background?: string;
@@ -276,7 +280,7 @@ export interface Run {
   flags: Record<string, true>;
   stats: RunStats;
   /** Resolved outcome: a pending fight/event/etc. the UI is in the middle of. */
-  pending: null | { kind: 'fight'; encounter: string; from: 'node' | 'event'; eventText?: string } | { kind: 'event'; event: string } | { kind: 'recruit'; def: string } | { kind: 'camp' } | { kind: 'shop'; stock: string[] } | { kind: 'reward'; gold: number; items: string[]; relics?: string[]; xp: number; levelUps: string[] };
+  pending: null | { kind: 'fight'; encounter: string; from: 'node' | 'event'; eventText?: string; battle?: import('../engine/battle').BattleSave } | { kind: 'event'; event: string } | { kind: 'recruit'; def: string } | { kind: 'camp' } | { kind: 'shop'; stock: string[] } | { kind: 'reward'; gold: number; items: string[]; relics?: string[]; xp: number; levelUps: string[] };
   over: null | 'won' | 'lost';
   log: string[];
   createdAt: number;

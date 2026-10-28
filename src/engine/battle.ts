@@ -41,7 +41,24 @@ export interface Combatant {
   sprite: string;
   size: 'small' | 'medium' | 'large';
   acted: number;
+  /** Who summoned this enemy; summons are routed when their summoner is. */
+  summoner?: string;
+  /** Summons this enemy has made this battle (capped). */
+  summons?: number;
+  /** Turns the Break bar ignores chips (boss phases that must get their moment). */
+  breakLock?: number;
 }
+
+/** Plain-data snapshot of a battle for the save file. */
+export interface BattleSave {
+  rng: [number, number, number, number];
+  encounter: EncounterDef;
+  heroes: Combatant[]; bench: Combatant[]; enemies: Combatant[];
+  actor: string | null; plan: EnemyPlan | null; turns: number; over: BattleState['over'];
+  nextId: number; partyPassives: Passive[]; stats: BattleState['stats']; lastCommand: string | null;
+}
+
+export const SUMMONS_PER_SUMMONER = 3;
 
 export type BattleAction =
   | { t: 'attack'; target: string }
@@ -151,7 +168,7 @@ export function heroCombatant(s: BattleState | null, m: PartyMember, run: Run | 
 }
 
 /** Global enemy tuning knobs (applied on top of the data tables and the level scaling). */
-export const ENEMY_TUNE = { hp: 1.75, atk: 1.5, def: 1.25, elite: 0.85, hpPerLevel: 0.12, atkPerLevel: 0.07, defPerLevel: 0.05 };
+export const ENEMY_TUNE = { hp: 2.2, atk: 1.8, def: 1.25, elite: 1.0, hpPerLevel: 0.12, atkPerLevel: 0.07, defPerLevel: 0.05 };
 
 export function enemyCombatant(s: BattleState, defId: string, level: number, summoned = false): Combatant {
   const d = ENEMIES[defId];
@@ -168,9 +185,26 @@ export function enemyCombatant(s: BattleState, defId: string, level: number, sum
     hp: base.hp, maxHp: base.hp, mp: base.mp, maxMp: base.mp, base, statuses: [], tick: 0,
     breakMax: d.breakMax, breakNow: d.breakMax, broken: false, guard: false, ko: false,
     passives: d.passives ?? [], abilities: d.intents.map((i) => i.ability), weapon: { type: 'blunt', power: 100 },
-    weak: [...d.weak], resist: [...d.resist], immune: [...(d.immune ?? [])], intentIdx: d.pattern === 'random' || d.boss || d.elite ? 0 : s.rng.int(0, Math.max(0, d.pattern.length - 1)), phase: 0, summoned, sprite: d.sprite, size: d.size, acted: 0,
+    // patterns are authored to teach (a charge, wait or lure before every heavy), so every foe starts at the top
+    weak: [...d.weak], resist: [...d.resist], immune: [...(d.immune ?? [])], intentIdx: 0, phase: 0, summoned, sprite: d.sprite, size: d.size, acted: 0,
   };
   return c;
+}
+
+export function serializeBattle(s: BattleState): BattleSave {
+  const { rng, encounter, heroes, bench, enemies, actor, plan, turns, over, nextId, partyPassives, stats, lastCommand } = s;
+  return JSON.parse(JSON.stringify({ rng: rng.s, encounter, heroes, bench, enemies, actor, plan, turns, over, nextId, partyPassives, stats, lastCommand }));
+}
+
+/** Rebuild a battle from a save; the bag is the run's live bag. Events start empty. */
+export function restoreBattle(run: Run, data: BattleSave): BattleState {
+  const s: BattleState = {
+    rng: new Rng(data.rng), encounter: data.encounter, heroes: data.heroes, bench: data.bench, enemies: data.enemies, bag: run.bag,
+    actor: data.actor, plan: data.plan, turns: data.turns, over: data.over, events: [], nextId: data.nextId, partyPassives: data.partyPassives,
+    stats: data.stats, lastCommand: data.lastCommand,
+  };
+  if (!s.actor && !s.over) advance(s);
+  return s;
 }
 
 export function createBattle(rng: Rng, run: Run, encounter: EncounterDef, partyPassives: Passive[] = []): BattleState {
@@ -239,6 +273,7 @@ export function advance(s: BattleState): void {
     }
     s.actor = c.id;
     s.turns++;
+    if (c.breakLock) c.breakLock--;
     emit(s, { kind: 'turn', who: c.id });
     if (c.side === 'enemy') s.plan = planEnemy(s, c);
     return;
@@ -469,9 +504,11 @@ function applyEffect(s: BattleState, c: Combatant, e: Effect, targets: Combatant
     case 'summon': {
       const n = alive(s.enemies).filter((x) => x.def === e.enemy).length;
       const cap = e.max ?? ENEMIES[e.enemy]?.summonCap ?? 2;
-      if (c.side === 'enemy' && n < cap && alive(s.enemies).length < 5) {
+      if (c.side === 'enemy' && n < cap && alive(s.enemies).length < 5 && (c.summons ?? 0) < SUMMONS_PER_SUMMONER) {
         const sm = enemyCombatant(s, e.enemy, c.level, true);
         sm.tick = c.tick + turnCost(sm);
+        sm.summoner = c.id;
+        c.summons = (c.summons ?? 0) + 1;
         s.enemies.push(sm);
         emit(s, { kind: 'summon', who: c.id, enemy: sm.id });
       }
@@ -574,11 +611,14 @@ export function damage(s: BattleState, att: Combatant, def: Combatant, hit: Hit,
 }
 
 function chip(s: BattleState, t: Combatant, n: number) {
+  if ((t.breakLock ?? 0) > 0) return;
   t.breakNow = Math.max(0, t.breakNow - n);
   emit(s, { kind: 'chip', target: t.id, amount: n, left: t.breakNow });
   if (t.breakNow === 0 && !t.broken) {
     t.broken = true;
     s.stats.breaks++;
+    // a Break always costs the foe a turn: push it back so at least one hero acts into the window
+    t.tick += turnCost(t);
     emit(s, { kind: 'break', target: t.id });
     for (const h of alive(s.heroes)) { const mp = passivePower(passives(s, h), 'mpOnBreak'); if (mp) { h.mp = Math.min(h.maxMp, h.mp + 4 * mp); emit(s, { kind: 'mp', target: h.id, amount: 4 * mp }); } }
     bossPhase(s, t, true);
@@ -601,6 +641,8 @@ function koCheck(s: BattleState, c: Combatant, by?: Combatant) {
   if (c.side === 'enemy') {
     s.stats.kills++;
     if (by && by.side === 'hero' && hasPassive(passives(s, by), 'hasteOnKill')) by.tick -= Math.round(turnCost(by) * 0.5);
+    // summons scarper with their summoner
+    for (const sm of alive(s.enemies)) if (sm.summoner === c.id) { sm.ko = true; sm.statuses = []; emit(s, { kind: 'ko', target: sm.id }); }
   } else if (s.heroes.includes(c)) {
     reinforce(s, c);
   }
@@ -624,6 +666,7 @@ function bossPhase(s: BattleState, c: Combatant, onBreak: boolean) {
   if (next.immune) c.immune = [...next.immune];
   if (next.heal) heal(s, c, c, Math.round(c.maxHp * next.heal));
   if (next.breakMax) { c.breakMax = next.breakMax; c.breakNow = next.breakMax; c.broken = false; }
+  if (next.breakLock) c.breakLock = next.breakLock;
 }
 
 function checkEnd(s: BattleState): boolean {
@@ -688,12 +731,14 @@ function enemyAct(s: BattleState, c: Combatant, guard: Grade[]) {
 
 // ---------------------------------------------------------------- after
 
-/** Write HP/MP back to the party. On a win, KO'd members stand up with 1 HP. */
+/** Write HP/MP back to the party and keep the line-up as it stood. On a win, KO'd members stand up with 1 HP and MP refills by half. */
 export function applyToParty(s: BattleState, run: Run) {
   for (const c of [...s.heroes, ...s.bench]) {
     const m = run.party.find((p) => p.id === c.member);
     if (!m) continue;
     m.hp = c.ko ? (s.over === 'win' ? 1 : 0) : c.hp;
-    m.mp = c.mp;
+    m.mp = s.over === 'win' ? Math.min(c.maxMp, c.mp + Math.round(c.maxMp * 0.5)) : c.mp;
   }
+  const front = s.heroes.map((c) => c.member).filter((id): id is string => !!id && run.party.some((p) => p.id === id));
+  if (front.length === s.heroes.length) run.active = front;
 }
