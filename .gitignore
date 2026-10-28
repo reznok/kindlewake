@@ -5,3 +5,4 @@ dist/
 .claude/
 assets/raw/
 assets/cache/
+tests/tmp/
