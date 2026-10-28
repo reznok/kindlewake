@@ -31,7 +31,7 @@ export function relicPool(ledger: Ledger, run: Run): string[] {
 /** Record a finished run and apply unlock rules. Returns the newly unlocked rules. */
 export function recordRun(ledger: Ledger, run: Run): UnlockDef[] {
   const rec: RunRecord = {
-    seed: run.seed, act: run.stats.deepestAct, nodes: run.stats.nodes, result: run.over === 'won' ? 'won' : 'lost',
+    seed: run.seed, act: run.stats.deepestAct, nodes: run.stats.nodes, result: run.over === 'won' ? 'won' : run.over === 'lost' ? 'lost' : 'left',
     killedBy: run.stats.killedBy, party: run.party.map((m) => m.def), kills: run.stats.kills, turns: run.stats.turns, when: Date.now(),
   };
   ledger.runs.push(rec);

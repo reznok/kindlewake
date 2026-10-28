@@ -100,10 +100,37 @@ export const TAGLINES: { always: string[]; gated: { seen: string; lines: string[
   ],
 };
 
+/**
+ * A hero's reaction when a lure or debuff lands, keyed by the enemy intent id. `{who}` is the hero it landed on
+ * (or the first of them). The battle UI picks one at random and shows it only sometimes.
+ */
+export const REACTIONS: Record<string, string[]> = {
+  shiny: ['{who} checks for buttons. All present. For now.', '"It\'s looking at my buttons," says {who}, and covers them.'],
+  caw: ['{who} is being heckled by a crow and takes it personally.'],
+  dim: ['The light goes thin around {who}. It is still a nice day. It is just a slightly less nice one.'],
+  eat: ['{who} feels the warmth go out of the afternoon.'],
+  eat_all: ['The afternoon goes grey. Everybody feels it.'],
+  stare: ['The scarecrow stares at {who}. {who} stares back. The scarecrow is better at it.'],
+  bylaws: ['{who} is read a bylaw. It is very long. It is not even the relevant one.'],
+  tangle: ['{who} is tangled in kite string and a parcel that wants a signature.'],
+  slime: ['{who} steps in it. Everyone steps in it. It was the whole path.'],
+  sigh: ['The blanket sighs. {who} feels unaccountably sad about a picnic that happened to someone else.'],
+  hush: ['"Shh," says the Sister, and {who} finds that the Guard has gone quiet too.'],
+  lullaby: ['{who} yawns. It is not even late.'],
+  smoke: ['{who} coughs. Somewhere in the smoke, somebody is apologising.'],
+  speech: ['Odo is on his seventh point. {who} has lost count of the sub-points.'],
+  dust: ['Grey dust settles on everyone. It is very hard to feel brave while dusty.'],
+  shush: ['The snuffer bell dips over {who}. The world is briefly quieter and worse.'],
+  lunch: ['The bee eats. {who} is somehow offended by this.'],
+  preserve: ['The jam reknits. It is, {who} supposes, what jam is for.'],
+  sandwich: ['A sandwich is offered. {who} does not take it. The sandwich is offended.'],
+  go_home: ['"Please go home," it says. {who} considers it, briefly.'],
+};
+
 export const TIPS: string[] = [
   'Tap as the ring closes. A Bright hit on a weakness takes two off the Break bar.',
   "A Broken foe has to remember what it is. Hit it while it's remembering.",
-  'Push a Cracked foe\'s turn back and it stays Cracked longer.',
+  'Push a Broken foe\'s turn back and it stays Broken longer.',
   'Heavy and charge intents are the ones to Crack, or to Guard.',
   'A Steady guard restores Moxie. Nothing restores your nerve like a goat bouncing off a skillet lid.',
   "The map shows what's coming. Pack your verbs accordingly.",

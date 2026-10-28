@@ -289,7 +289,8 @@ export interface Run {
 
 // ---------------------------------------------------------------- ledger (meta)
 
-export interface RunRecord { seed: number; act: number; nodes: number; result: 'won' | 'lost'; killedBy?: string; party: string[]; kills: number; turns: number; when: number }
+/** `left` = the player abandoned the run; it counts as a Wake but not as a guttering. */
+export interface RunRecord { seed: number; act: number; nodes: number; result: 'won' | 'lost' | 'left'; killedBy?: string; party: string[]; kills: number; turns: number; when: number }
 
 export interface Ledger {
   runs: RunRecord[];

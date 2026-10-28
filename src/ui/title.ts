@@ -56,7 +56,7 @@ export class TitleScreen implements Screen {
 
   /** "Start fresh" over a Wake in progress: it still counts. Record it in the Ledger, show any unlocks, then begin. */
   private abandon(run: Run) {
-    run.over = 'lost';
+    run.over = null;
     run.stats.killedBy = 'giving up';
     run.pending = null;
     const fresh = recordRun(this.app.ledger, run);
