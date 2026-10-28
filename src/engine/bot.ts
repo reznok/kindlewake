@@ -6,8 +6,8 @@ import { Rng } from '../core/rng';
 import type { Grade, Ledger, MapNode, Run } from '../core/types';
 import { ABILITIES } from '../data/abilities';
 import { ITEMS } from '../data/items';
-import { alive, type BattleAction, type BattleState, byId, type Combatant, eff, hasStatus, legalActions, nextIntent, step } from './battle';
-import { campHeal, campSpark, campForge, chooseEvent, claimReward, enterNode, finishBattle, pickSpark, reachable, recruit, shopBuy, sparkOffers, startBattle, price, equip } from './run';
+import { alive, type BattleAction, type BattleState, byId, type Combatant, commandKey, eff, hasStatus, legalActions, nextIntent, rehearsedFoes, step } from './battle';
+import { campHeal, campSpark, campForge, canChoose, chooseEvent, claimReward, enterNode, eventChoices, finishBattle, pickSpark, reachable, recruit, shopBuy, sparkOffers, startBattle, price, equip } from './run';
 import { memberStats, memberWeapon } from './stats';
 
 export interface BotOptions { timingSkill: number; rng: Rng }
@@ -65,8 +65,10 @@ export function chooseHeroAction(s: BattleState, o: BotOptions): { action: Battl
   }
   // 4. best damage option: score skills and the weapon by expected damage + break value
   let best: { action: BattleAction; n: number; score: number } | null = null;
+  const watched = rehearsedFoes(s).length > 0;
   const consider = (action: BattleAction, hits: { type: string; power: number; scale: 'atk' | 'mag' | 'none'; chip?: number }[], targets: Combatant[], mp: number) => {
     let score = 0;
+    if (watched && commandKey(s, action) === s.lastCommand) score -= 1000;
     for (const t of targets) for (const h of hits) {
       const d = expectDmg(c, t, h);
       score += Math.min(d, t.hp) * (t.hp <= d ? 1.2 : 1);
@@ -171,7 +173,12 @@ export function playRun(run: Run, ledger: Ledger, o: BotOptions, maxNodes = 80):
     switch (p.kind) {
       case 'fight': { const s = startBattle(run); playBattle(s, o); finishBattle(run, s); break; }
       case 'reward': claimReward(run, p.relics?.[0]); break;
-      case 'event': { const r = chooseEvent(run, o.rng.int(0, 1)); void r; break; }
+      case 'event': {
+        const ok = eventChoices(run).map((c, i) => ({ c, i })).filter((x) => canChoose(run, x.c));
+        if (!ok.length) { run.pending = null; run.map.nodes[run.map.at!].done = true; break; }
+        chooseEvent(run, o.rng.pick(ok).i);
+        break;
+      }
       case 'recruit': recruit(run, true, run.party.length >= 6 ? run.party.sort((a, b) => a.level - b.level)[0].id : undefined); break;
       case 'camp': {
         const avgHp = run.party.reduce((a, m) => a + m.hp / memberStats(m, run).hp, 0) / run.party.length;

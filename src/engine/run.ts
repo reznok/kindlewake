@@ -445,11 +445,16 @@ export function eventChoices(run: Run): EventChoice[] {
   return EVENTS[run.pending.event].choices.filter((c) => !c.requires || run.flags[c.requires]);
 }
 
-/** A choice that costs gold needs the gold. */
-export function canChoose(run: Run, c: EventChoice): boolean {
+/** Why a choice cannot be taken (gold, party full, bag full), or null when it can. */
+export function choiceBlocker(run: Run, c: EventChoice): string | null {
   const cost = c.outcomes.filter((o) => o.kind === 'gold' && o.amount < 0).reduce((a, o) => a + (o.kind === 'gold' ? -o.amount : 0), 0);
-  return run.gold >= cost;
+  if (run.gold < cost) return 'Not enough gold';
+  if (c.outcomes.some((o) => o.kind === 'recruit') && run.party.length >= PARTY_MAX) return 'Party is full';
+  if (c.outcomes.some((o) => o.kind === 'item' && ITEMS[o.id]?.kind !== 'consumable') && run.bag.length >= bagSize(run)) return 'Bag is full';
+  return null;
 }
+
+export function canChoose(run: Run, c: EventChoice): boolean { return choiceBlocker(run, c) === null; }
 
 export function chooseEvent(run: Run, choice: number): { text: string; fight: boolean } {
   if (run.pending?.kind !== 'event') throw new Error('no event pending');

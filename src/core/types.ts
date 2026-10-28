@@ -73,7 +73,9 @@ export type PassiveId =
   | 'counter' | 'lifesteal' | 'chipPlus' | 'guardMp' | 'firstStrike' | 'thorns' | 'cheatDeath' | 'critPlus' | 'timingWide'
   | 'mpRegen' | 'hpRegen' | 'goldPct' | 'xpPct' | 'startBarrier' | 'reviveOnce' | 'shopDiscount' | 'extraBag' | 'perfectHeal'
   | 'benchXp' | 'breakBonus' | 'guardAll' | 'poisonTouch' | 'burnTouch' | 'chillTouch' | 'shockTouch' | 'bleedTouch'
-  | 'tauntAura' | 'hasteOnKill' | 'mpOnBreak' | 'luckyDrops' | 'ironGuard' | 'spdPlus';
+  | 'tauntAura' | 'hasteOnKill' | 'mpOnBreak' | 'luckyDrops' | 'ironGuard' | 'spdPlus'
+  /** Enemy only: counters a hero who repeats the previous hero command. */
+  | 'rehearsed';
 
 export interface Passive { id: PassiveId; power?: number }
 
@@ -133,8 +135,15 @@ export interface EnemyDef {
   sprite: string;
   elite?: boolean;
   boss?: boolean;
-  /** Boss phase: when HP drops below `hpBelow` (fraction) or on the first Break, switch pattern. */
-  phases?: { hpBelow?: number; onBreak?: boolean; pattern: string[]; message: string; heal?: number; breakMax?: number }[];
+  /**
+   * Boss phases, in order. A phase triggers when HP drops below `hpBelow` (fraction) and/or on a Break (`onBreak`).
+   * While a phase remains, lethal damage leaves the enemy at 1 HP and triggers the next phase instead of a KO.
+   * A phase may reshape the enemy: new name, sprite, size, weaknesses, Break bar; `heal` is a fraction of max HP.
+   */
+  phases?: {
+    hpBelow?: number; onBreak?: boolean; pattern: string[]; message: string; heal?: number; breakMax?: number;
+    name?: string; sprite?: string; size?: 'small' | 'medium' | 'large'; weak?: DamageType[]; resist?: DamageType[]; immune?: DamageType[];
+  }[];
   /** Can be summoned up to this many copies at once. */
   summonCap?: number;
   passives?: Passive[];

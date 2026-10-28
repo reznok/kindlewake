@@ -96,7 +96,19 @@ export interface BattleState {
   /** Party-wide passives (relics) live here so summons and swaps see them. */
   partyPassives: Passive[];
   stats: { perfects: number; breaks: number; kills: number };
+  /** The previous hero command key (`attack`, a skill id, `item:<def>`); `rehearsed` enemies punish a repeat. */
+  lastCommand: string | null;
 }
+
+/** The command key an action would record; the UI marks it when a `rehearsed` enemy stands. */
+export function commandKey(s: BattleState, a: BattleAction): string | null {
+  if (a.t === 'attack') return 'attack';
+  if (a.t === 'skill') return a.id;
+  if (a.t === 'item') { const inst = s.bag.find((i) => i.id === a.item); return inst ? 'item:' + inst.def : null; }
+  return null;
+}
+
+export function rehearsedFoes(s: BattleState): Combatant[] { return alive(s.enemies).filter((e) => hasPassive(e.passives, 'rehearsed')); }
 
 export const GRADE_MULT: Record<Grade, number> = { miss: 0.9, good: 1, perfect: 1.25 };
 export const GUARD_MULT: Record<Grade, number> = { miss: 1, good: 0.7, perfect: 0.5 };
@@ -151,7 +163,7 @@ export function enemyCombatant(s: BattleState, defId: string, level: number, sum
     hp: base.hp, maxHp: base.hp, mp: base.mp, maxMp: base.mp, base, statuses: [], tick: 0,
     breakMax: d.breakMax, breakNow: d.breakMax, broken: false, guard: false, ko: false,
     passives: d.passives ?? [], abilities: d.intents.map((i) => i.ability), weapon: { type: 'blunt', power: 100 },
-    weak: d.weak, resist: d.resist, immune: d.immune ?? [], intentIdx: d.pattern === 'random' ? 0 : s.rng.int(0, Math.max(0, d.pattern.length - 1)), phase: 0, summoned, sprite: d.sprite, size: d.size, acted: 0,
+    weak: [...d.weak], resist: [...d.resist], immune: [...(d.immune ?? [])], intentIdx: d.pattern === 'random' || d.boss || d.elite ? 0 : s.rng.int(0, Math.max(0, d.pattern.length - 1)), phase: 0, summoned, sprite: d.sprite, size: d.size, acted: 0,
   };
   return c;
 }
@@ -159,7 +171,7 @@ export function enemyCombatant(s: BattleState, defId: string, level: number, sum
 export function createBattle(rng: Rng, run: Run, encounter: EncounterDef, partyPassives: Passive[] = []): BattleState {
   const s: BattleState = {
     rng, encounter, heroes: [], bench: [], enemies: [], bag: run.bag, actor: null, plan: null, turns: 0, over: null, events: [],
-    nextId: 1, partyPassives, stats: { perfects: 0, breaks: 0, kills: 0 },
+    nextId: 1, partyPassives, stats: { perfects: 0, breaks: 0, kills: 0 }, lastCommand: null,
   };
   for (const id of run.active) { const m = run.party.find((p) => p.id === id); if (m) s.heroes.push(heroCombatant(s, m, run)); }
   for (const m of run.party) if (!run.active.includes(m.id)) s.bench.push(heroCombatant(s, m, run));
@@ -274,6 +286,19 @@ export function step(s: BattleState, action: BattleAction | null, timing: Timing
 
 function heroAct(s: BattleState, c: Combatant, a: BattleAction, grades: Grade[]) {
   c.acted++;
+  const key = commandKey(s, a);
+  if (key) {
+    const repeat = key === s.lastCommand;
+    s.lastCommand = key;
+    if (repeat) for (const e of rehearsedFoes(s)) {
+      const back = Math.max(1, Math.round(eff(e, 'atk') * 0.6));
+      c.hp = Math.max(0, c.hp - back);
+      emit(s, { kind: 'msg', text: `"I know." ${e.name} was ready for that.` });
+      emit(s, { kind: 'counter', who: e.id, target: c.id, dmg: back });
+      koCheck(s, c, e);
+      if (c.ko) { c.tick += turnCost(c); return; }
+    }
+  }
   switch (a.t) {
     case 'attack': {
       const target = byId(s, a.target);
@@ -413,7 +438,7 @@ function applyEffect(s: BattleState, c: Combatant, e: Effect, targets: Combatant
       return;
     }
     case 'mp': {
-      for (const t of targets) if (!t.ko) { const a = Math.min(e.amount, t.maxMp - t.mp); t.mp += a; emit(s, { kind: 'mp', target: t.id, amount: a }); }
+      for (const t of targets) if (!t.ko) { const a = Math.max(-t.mp, Math.min(e.amount, t.maxMp - t.mp)); t.mp += a; emit(s, { kind: 'mp', target: t.id, amount: a }); }
       return;
     }
     case 'status': {
@@ -485,12 +510,14 @@ export function damage(s: BattleState, att: Combatant, def: Combatant, hit: Hit,
   if (immune) mult = 0;
   if (weak) mult *= 1.5;
   if (resist) mult *= 0.5;
-  if (def.broken) mult *= 1.5;
+  if (def.broken) mult *= 1.5 + 0.25 * passivePower(ap, 'breakBonus');
   mult *= GRADE_MULT[grade];
   let guarded = false;
   if (!hit.pierceGuard) {
     let gm = 1;
     if (def.guard) { gm *= hasPassive(passives(s, def), 'ironGuard') ? 0.35 : 0.5; guarded = true; }
+    // a guarding ally with guardAll shields the row
+    if (def.side === 'hero' && !def.guard && alive(s.heroes).some((h) => h !== def && h.guard && hasPassive(passives(s, h), 'guardAll'))) gm *= 0.85;
     if (def.side === 'hero' && att.side === 'enemy') {
       const g = hasStatus(def, 'shock') ? 'miss' : guardGrade;
       gm *= GUARD_MULT[g];
@@ -514,6 +541,8 @@ export function damage(s: BattleState, att: Combatant, def: Combatant, hit: Hit,
   }
   const before = def.hp;
   def.hp = Math.max(0, def.hp - dmg);
+  // a boss with phases left survives at 1 HP and changes shape instead
+  if (def.hp === 0 && def.side === 'enemy' && (ENEMIES[def.def]?.phases?.length ?? 0) > def.phase) { def.hp = 1; dmg = before - 1; }
   emit(s, { kind: 'hit', who: att.id, target: def.id, dmg, type: hit.type, grade, crit, weak, resist, immune, guarded });
   // break chips
   if (weak && def.side === 'enemy' && !def.broken && (hit.chip ?? 1) > 0) {
@@ -577,13 +606,19 @@ function bossPhase(s: BattleState, c: Combatant, onBreak: boolean) {
   if (!d.phases) return;
   const next = d.phases[c.phase];
   if (!next) return;
-  const trigger = (onBreak && next.onBreak) || (next.hpBelow !== undefined && c.hp / c.maxHp < next.hpBelow);
+  const trigger = (onBreak && next.onBreak) || (next.hpBelow !== undefined && c.hp / c.maxHp < next.hpBelow) || c.hp <= 1;
   if (!trigger) return;
   c.phase++;
   c.intentIdx = 0;
   emit(s, { kind: 'phase', who: c.id, message: next.message });
+  if (next.name) c.name = next.name;
+  if (next.sprite) c.sprite = next.sprite;
+  if (next.size) c.size = next.size;
+  if (next.weak) c.weak = [...next.weak];
+  if (next.resist) c.resist = [...next.resist];
+  if (next.immune) c.immune = [...next.immune];
   if (next.heal) heal(s, c, c, Math.round(c.maxHp * next.heal));
-  if (next.breakMax) { c.breakMax = next.breakMax; if (!c.broken) c.breakNow = next.breakMax; }
+  if (next.breakMax) { c.breakMax = next.breakMax; c.breakNow = next.breakMax; c.broken = false; }
 }
 
 function checkEnd(s: BattleState): boolean {
