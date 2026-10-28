@@ -1,4 +1,21 @@
 /** A hi-DPI canvas that tracks its CSS box, plus a frame loop helper. */
+
+/**
+ * Canvas text ignores the CSS ligature switch, and the pixel face draws "fi" / "fl" as one odd glyph. A zero-width
+ * non-joiner between the pair stops the ligature, so every canvas text call gets one (installed once, on import).
+ */
+export function noLigatures(text: string): string { return text.replace(/f(?=[il])/g, 'f\u200c'); }
+
+if (typeof CanvasRenderingContext2D !== 'undefined') {
+  const proto = CanvasRenderingContext2D.prototype as CanvasRenderingContext2D & { __noLig?: boolean };
+  if (!proto.__noLig) {
+    proto.__noLig = true;
+    const fill = proto.fillText, stroke = proto.strokeText, measure = proto.measureText;
+    proto.fillText = function (this: CanvasRenderingContext2D, t: string, x: number, y: number, w?: number) { return w === undefined ? fill.call(this, noLigatures(String(t)), x, y) : fill.call(this, noLigatures(String(t)), x, y, w); };
+    proto.strokeText = function (this: CanvasRenderingContext2D, t: string, x: number, y: number, w?: number) { return w === undefined ? stroke.call(this, noLigatures(String(t)), x, y) : stroke.call(this, noLigatures(String(t)), x, y, w); };
+    proto.measureText = function (this: CanvasRenderingContext2D, t: string) { return measure.call(this, noLigatures(String(t))); };
+  }
+}
 export class Surface {
   canvas: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;

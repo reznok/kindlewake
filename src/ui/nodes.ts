@@ -1,16 +1,18 @@
 /** Sheets for node business: event, recruit, camp, shop, reward. */
-import type { Run } from '../core/types';
+import type { PartyMember, Run } from '../core/types';
 import { CHARACTERS } from '../data/characters';
+import { ENCOUNTERS } from '../data/encounters';
+import { ENEMIES } from '../data/enemies';
 import { EVENTS } from '../data/events';
 import { ITEMS } from '../data/items';
 import { RELICS } from '../data/relics';
-import { RECRUIT_SCENES, SHOP } from '../data/text';
-import { bagSize, campForge, campHeal, campSpark, canChoose, chooseEvent, claimReward, eventChoices, finishNode, memberById, PARTY_MAX, price, recruit, RELIC_MAX, shopBuy, sparkOffers } from '../engine/run';
+import { BOSS_MESSAGES, EVENT_VARIANTS, GLOSSARY, RECRUIT_SCENES, SHOP } from '../data/text';
+import { bagSize, campForge, campHeal, campSpark, canChoose, chooseEvent, claimReward, currentNode, eventChoices, finishNode, memberById, PARTY_MAX, pickSpark, price, recruit, RELIC_MAX, shopBuy, sparkOffers } from '../engine/run';
 import { memberStats, memberWeapon } from '../engine/stats';
 import type { App } from './app';
-import { play } from './audio';
+import { music, play } from './audio';
 import { btn, el, rich } from './dom';
-import { campScene, pick as pickOne, shopGreeting, shopLine, speaker } from './flavour';
+import { campScene, members, pick as pickOne, shopGreeting, shopLine, speaker } from './flavour';
 import { toBattle, toEnd, toMap } from './flow';
 import { cap, ROLE_COLOR } from './palette';
 import { openSparkPick } from './party';
@@ -34,9 +36,37 @@ function diff(a: Snap, b: Snap): HTMLElement[] {
   for (const [def, n] of a.bag) { const d = n - (b.bag.get(def) ?? 0); if (d > 0) out.push(el('span.pill.bad', 'Lost ' + (ITEMS[def]?.name ?? def))); }
   for (const r of b.relics) if (!a.relics.includes(r)) out.push(el('span.pill.good', 'Keepsake: ' + RELICS[r].name));
   for (const p of b.party) if (!a.party.includes(p)) out.push(el('span.pill.good', CHARACTERS[p].name + ' joins!'));
-  if (b.hp > a.hp) out.push(el('span.pill.good', 'Party healed'));
-  if (b.hp < a.hp) out.push(el('span.pill.bad', 'Party hurt'));
+  if (b.hp > a.hp) out.push(el('span.pill.good', `Everyone heals a little (+${b.hp - a.hp} HP in all)`));
+  if (b.hp < a.hp) out.push(el('span.pill.bad', `Party hurt (-${a.hp - b.hp} HP in all)`));
   return out;
+}
+
+// ------------------------------------------------------------ music
+
+/** Sheets that are a pause on the road (Fireside, shop, events) play the camp track; the map's comes back after. */
+function campMusic(app: App): () => void {
+  music('camp');
+  return () => setTimeout(() => { if (app.screen?.name === 'map') music('map'); }, 0);
+}
+
+// ------------------------------------------------------------ party-keyed event lines
+
+/** Variant lines held back on purpose (twist protection, review P1.24): `event:who:choice` ('-' = the event text). */
+const HELD_BACK = new Set(['ev_letter:barty:-']);
+
+/** Lines added after an event's text (`choice` undefined) or a choice's result, for whoever is in the party. */
+function eventVariants(run: Run, eventId: string, choice?: number): HTMLElement[] {
+  const here = members(run);
+  return (EVENT_VARIANTS[eventId] ?? [])
+    .filter((v) => v.choice === choice && here.has(v.who) && !HELD_BACK.has(`${eventId}:${v.who}:${choice ?? '-'}`))
+    .map((v) => el('p.variant', rich(v.text)));
+}
+
+/** A character's level-up line; when the data has several they rotate by level. */
+function levelUpLine(m: PartyMember): string | undefined {
+  const l = CHARACTERS[m.def]?.lines.levelUp as string | string[] | undefined;
+  const list = Array.isArray(l) ? l : l ? [l] : [];
+  return list.length ? list[m.level % list.length] : undefined;
 }
 
 // ------------------------------------------------------------ voice lines
@@ -52,9 +82,10 @@ export function openEvent(app: App): Sheet | null {
   const run = app.run!;
   if (run.pending?.kind !== 'event') return null;
   const ev = EVENTS[run.pending.event];
-  const s = new Sheet(app, { title: ev.title, closable: false });
+  const s = new Sheet(app, { title: ev.title, closable: false, onClose: campMusic(app) });
   const choices = eventChoices(run);
-  s.fill([el('p.event-text', ev.text)], [el('div.choices', choices.map((c, i) => btn(c.label, () => {
+  const intro = eventVariants(run, ev.id);
+  s.fill([el('p.event-text', rich(ev.text)), intro], [el('div.choices', choices.map((c, i) => btn(c.label, () => {
     if (!canChoose(run, c)) { play('menu'); return; }
     const before = snap(run);
     const r = chooseEvent(run, i);
@@ -62,7 +93,7 @@ export function openEvent(app: App): Sheet | null {
     play('confirm');
     app.log(`${ev.title}: ${c.label}. ${r.text}`);
     app.persist();
-    s.fill([el('p.event-text.muted', ev.text), el('p.event-choice', '→ ' + c.label), el('p.event-result', r.text), el('div.pills', diff(before, after))],
+    s.fill([el('p.event-text.muted', rich(ev.text)), intro, el('p.event-choice', '→ ' + c.label), el('p.event-result', rich(r.text)), eventVariants(run, ev.id, ev.choices.indexOf(c)), el('div.pills', diff(before, after))],
       [btn(r.fight ? 'Fight!' : 'Continue', () => {
         s.close();
         if (r.fight) toBattle(app);
@@ -118,7 +149,7 @@ export function openCamp(app: App): Sheet | null {
   if (run.pending?.kind !== 'camp') return null;
   const fireside = campScene(run);
   if (fireside) app.persist();
-  const s = new Sheet(app, { title: fireside ? `Fireside: ${fireside.scene.title}` : 'Fireside', closable: false, cls: 'wide' });
+  const s = new Sheet(app, { title: fireside ? `Fireside: ${fireside.scene.title}` : 'Fireside', closable: false, cls: 'wide', onClose: campMusic(app) });
   const sceneBox = fireside ? el('div.scene', fireside.lines.map((l) => {
     if (l.who === null) return el('p.narr', rich(l.text));
     const name = speaker(l.who);
@@ -174,7 +205,7 @@ export function openCamp(app: App): Sheet | null {
 export function openShop(app: App): Sheet | null {
   const run = app.run!;
   if (run.pending?.kind !== 'shop') return null;
-  const s = new Sheet(app, { title: SHOP.name, closable: false, cls: 'wide' });
+  const s = new Sheet(app, { title: SHOP.name, closable: false, cls: 'wide', onClose: campMusic(app) });
   let said = shopGreeting(run);
   app.persist();
   const keeper = () => el('div.keeper', el('span.who', SHOP.keeper + ':'), el('div', said.map((l) => el('p', rich(l)))));
@@ -230,36 +261,91 @@ export function openReward(app: App): Sheet | null {
   if (p?.kind !== 'reward') return null;
   const s = new Sheet(app, { title: 'Victory!', closable: false, cls: 'wide' });
   let relic: string | undefined;
-  const ups = p.levelUps.map((id) => memberById(run, id)).filter(Boolean);
-  // one level-up line per reward, from whoever levelled (when they have one)
-  const speakers = ups.filter((m) => CHARACTERS[m!.def].lines.levelUp);
+  const ups = p.levelUps.map((id) => memberById(run, id)).filter((m): m is PartyMember => !!m);
+  // one level-up line per reward, from whoever levelled (when they have one); several lines rotate by level
+  const speakers = ups.filter((m) => levelUpLine(m));
   const lu = speakers.length ? pickOne(speakers)! : null;
-  const levelLine = lu ? speakerLine(lu.def, CHARACTERS[lu.def].lines.levelUp!) : null;
+  const levelLine = lu ? speakerLine(lu.def, levelUpLine(lu)!) : null;
+  const canTake = !!p.relics?.length && run.relics.length < RELIC_MAX;
+  const finish = () => {
+    // the act boss's node decides the act-end scene; look before the claim moves the run on
+    const node = currentNode(run);
+    const enc = node?.kind === 'boss' && node.encounter ? ENCOUNTERS[node.encounter] : undefined;
+    const boss = enc?.enemies.map((e) => e.def).find((d) => ENEMIES[d]?.boss);
+    const act = run.act;
+    claimReward(run, relic);
+    if (relic) app.log('Took keepsake ' + RELICS[relic].name + '.');
+    play('confirm');
+    app.persist();
+    s.close();
+    const next = () => (run.over ? toEnd(app) : toMap(app));
+    if (boss && actEndText(boss)) openActEnd(app, boss, act, next);
+    else next();
+  };
+  /** One row per member with a spark to pick: the offers as cards, picked right here. */
+  const sparkRow = (m: PartyMember) => {
+    const d = CHARACTERS[m.def];
+    const offers = sparkOffers(run, m.id);
+    if (!offers.length) return null;
+    return el('div.spark-row',
+      el('div.spark-who', portrait(d.sprite, d.name, 28), el('b', d.name), el('span.muted', m.pendingSparks > 1 ? ` picks a spark (${m.pendingSparks} to go)` : ' picks a spark')),
+      el('div.option-grid', offers.map((sp) => btn([el('b', sp.name), el('span.muted', sp.desc)], () => {
+        if (pickSpark(run, m.id, sp.id)) { play('buff'); app.log(`${d.name} learned ${sp.name}.`); app.persist(); render(); }
+      }, 'relic-card spark-card'))));
+  };
   const render = () => {
+    const sparkers = run.party.filter((m) => m.pendingSparks > 0 && sparkOffers(run, m.id).length);
     s.fill([
       el('div.pills', el('span.pill.good', '+' + p.gold + ' buttons'), el('span.pill', '+' + p.xp + ' XP'), p.items.map((i) => el('span.pill.good', 'Found ' + (ITEMS[i]?.name ?? i)))),
       ups.length ? [el('h4', 'Level up!'), el('div.lvl-ups', ups.map((m) => {
-        const d = CHARACTERS[m!.def];
-        const st = memberStats(m!, run);
-        return el('div.lvl-up', { title: `${m!.hp}/${st.hp} HP` }, portrait(d.sprite, d.name, 28), el('span', el('b', d.name), ' Lv ' + m!.level), m!.pendingSparks ? el('span.pill.spark', 'Spark!') : null);
-      })), levelLine ? el('p.quote', levelLine) : null, ups.some((m) => m!.pendingSparks) ? el('p.muted.small', 'Pick sparks from the Party sheet (Your Kindling) on the map.') : null] : null,
+        const d = CHARACTERS[m.def];
+        const st = memberStats(m, run);
+        return el('div.lvl-up', { title: `${m.hp}/${st.hp} HP` }, portrait(d.sprite, d.name, 28), el('span', el('b', d.name), ' Lv ' + m.level), m.pendingSparks ? el('span.pill.spark', 'Spark!') : null);
+      })), levelLine ? el('p.quote', levelLine) : null] : null,
+      sparkers.length ? [el('h4', 'Sparks'), el('p.muted.small', 'Pick one now, or later from the Party sheet.'), sparkers.map(sparkRow)] : null,
       p.relics?.length ? [el('h4', 'Pick a keepsake'), el('div.option-grid', p.relics.map((id) => {
         const r = RELICS[id];
-        const b = btn([el('b', r.name), el('span.muted', r.desc)], () => { relic = relic === id ? undefined : id; play('menu'); render(); }, 'relic-card' + (relic === id ? ' picked' : ''));
+        const b = btn([el('b', r.name), el('span.muted', r.desc)], () => { relic = relic === id ? undefined : id; play('menu'); render(); }, 'relic-card' + (relic === id ? ' picked' : ''), { disabled: !canTake });
         return b;
       }))] : null,
-      run.relics.length >= RELIC_MAX && p.relics?.length ? el('p.muted', 'Keepsake slots are full.') : null,
-    ], [btn(p.relics?.length && !relic ? 'Skip keepsake' : 'Continue', () => {
-      claimReward(run, relic);
-      if (relic) app.log('Took keepsake ' + RELICS[relic].name + '.');
-      play('confirm');
-      app.persist();
-      s.close();
-      if (run.over) toEnd(app);
-      else toMap(app);
-    }, 'big', { data: { default: '' } })]);
+      p.relics?.length && !canTake ? el('p.muted', 'Keepsake slots are full.') : null,
+    ], canTake ? [
+      // the primary needs a pick; skipping is a deliberate, quiet choice (Enter never skips)
+      btn(relic ? 'Take ' + RELICS[relic].name : 'Pick a keepsake', finish, 'big', { disabled: !relic, ...(relic ? { data: { default: '' } } : {}) }),
+      btn('Skip keepsake', () => { relic = undefined; finish(); }, 'ghost small skip'),
+    ] : [btn('Continue', finish, 'big', { data: { default: '' } })]);
   };
   render();
   play(ups.length ? 'levelup' : 'coin');
+  return s.open();
+}
+
+// ------------------------------------------------------------ act end
+
+interface ActEndText { after?: { text: string[]; byMember?: Record<string, string>; byFlag?: Record<string, string> }; bestiary?: string }
+
+function actEndText(boss: string): ActEndText | undefined {
+  const m = (BOSS_MESSAGES as unknown as Record<string, ActEndText | undefined>)[boss];
+  return m?.after ? m : undefined;
+}
+
+/**
+ * After an act boss's reward: the boss's `after` scene, the lines for whoever (and whatever) is present, the
+ * Bestiary's note, then one Onward. Any act boss with an `after` gets one.
+ */
+export function openActEnd(app: App, boss: string, act: number, then: () => void): Sheet | null {
+  const m = actEndText(boss);
+  const run = app.run;
+  if (!m?.after || !run) { then(); return null; }
+  const here = members(run);
+  const s = new Sheet(app, { title: `The end of act ${act}`, closable: false, cls: 'wide', onClose: () => setTimeout(then, 0) });
+  music('camp');
+  const who = Object.entries(m.after.byMember ?? {}).filter(([id]) => here.has(id)).map(([, line]) => el('p.variant', rich(line)));
+  const flags = Object.entries(m.after.byFlag ?? {}).filter(([f]) => run.flags[f]).map(([, line]) => el('p.variant', rich(line)));
+  s.fill([
+    el('div.act-end', m.after.text.map((t, i) => el(i === 0 ? 'p.event-text.lead' : 'p.event-text', rich(t))), who, flags),
+    m.bestiary ? el('p.bestiary', el('b', (GLOSSARY.bestiary?.term ?? 'The Bestiary') + ': '), el('i', rich(m.bestiary))) : null,
+  ], [btn('Onward', () => { play('confirm'); s.close(); }, 'big', { data: { default: '' } })]);
+  app.log(`Act ${act} is done.`);
   return s.open();
 }

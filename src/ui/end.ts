@@ -11,6 +11,7 @@ import { btn, el, rich } from './dom';
 import { toTitle } from './flow';
 import { endQuip, tip } from './flavour';
 import { portrait } from './portrait';
+import { unlockRow } from './sheets';
 import { DEATH_HEADER } from '../data/text';
 
 const recorded = new WeakMap<Run, UnlockDef[]>();
@@ -46,7 +47,8 @@ export class EndScreen implements Screen {
         el('p.end-quip', rich(endQuip(st.killedBy))),
         st.killedBy === 'giving up' ? el('p', `The Wake was abandoned in act ${st.deepestAct}.`) : el('p', 'The Kindling was routed by ', el('b', st.killedBy ?? 'misadventure'), ` in act ${st.deepestAct}. The Wake is over.`),
       ],
-      lb && !won ? el('p.muted', `Last blow: ${lb.target} took ${lb.dmg} from ${lb.by} with ${lb.hpBefore} HP left.`) : null,
+      lb && !won ? el('p.muted', `Last blow: ${lb.target} (${lb.hpBefore} HP) took ${lb.dmg} from ${lb.by}.`) : null,
+      this.app.turningPoint && !won ? el('p.turning-point', this.app.turningPoint) : null,
       el('div.end-cols',
         el('div',
           el('h4', 'The Kindling'),
@@ -63,7 +65,7 @@ export class EndScreen implements Screen {
           el('ol.last-log', run.log.slice(-12).map((l) => el('li', l))),
         ),
       ),
-      fresh.length ? el('div.unlocked', el('h4', 'Unlocked!'), fresh.map((u) => el('div', el('b', u.name), el('span.muted', ' — ' + u.desc)))) : null,
+      fresh.length ? el('div.unlocked', el('h4', 'Unlocked!'), fresh.map(unlockRow)) : null,
       el('p.muted.small.end-tip', el('b', 'Tip: '), tip()),
       el('div.end-foot', btn('Return to title', () => { play('confirm'); toTitle(this.app); }, 'big', { data: { default: '' } })),
     );

@@ -115,7 +115,7 @@ export class Fx {
       const pop = k < 0.15 ? 0.6 + (k / 0.15) * 0.55 : k < 0.3 ? 1.15 - ((k - 0.15) / 0.15) * 0.15 : 1;
       ctx.globalAlpha = k > 0.7 ? Math.max(0, 1 - (k - 0.7) / 0.3) : 1;
       // numbers in the 8-bit face (it runs wide, so a touch smaller), words in the body face
-      const num = /^[+-]?d/.test(f.text);
+      const num = /^[+-]?\d/.test(f.text);
       ctx.font = num ? `${Math.round(f.size * pop * 0.72)}px ${FONT_NUM}` : `700 ${Math.round(f.size * pop)}px ${FONT_UI}`;
       const y = f.y - f.rise * ease.out(Math.min(1, k * 1.6));
       ctx.lineWidth = Math.max(3, f.size / 5);

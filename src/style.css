@@ -48,7 +48,12 @@ body {
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior: none;
+  /* the pixel face maps "fi" / "fl" to a single odd glyph: never ligate */
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "clig" 0;
 }
+
+button, input, select, textarea { font-variant-ligatures: none; font-feature-settings: "liga" 0, "clig" 0; }
 
 #app {
   position: fixed;
@@ -452,3 +457,37 @@ ul.credits a { color: var(--ink-2); font-weight: 700; }
 .btn.li .seen { position: static; margin-left: 6px; }
 .end-quip { font-size: 17px; font-weight: 800; font-style: italic; color: #ffe8a3; margin: 2px 0 8px; }
 .end-tip { margin-top: 8px; }
+
+/* ---------------------------------------------------------------- review fixes (build 1) */
+
+/* battle: WEAK / resist / immune marks in the Skill and Item lists */
+.vd { font-size: 11px; font-weight: 900; padding: 1px 7px; border-radius: 999px; border: 2px solid var(--ink); margin-left: 4px; white-space: nowrap; text-transform: uppercase; letter-spacing: 0.03em; }
+.vd.weak { background: var(--sun); color: var(--ink); }
+.vd.resist { background: #dde3ee; color: var(--muted); text-transform: none; }
+.vd.immune { background: #ffd6e0; color: #a4133c; text-transform: none; text-decoration: line-through; }
+.battle-tools .btn.muted { background: #ffd6e0; }
+
+/* reward: sparks inline, quiet skip */
+.spark-row { margin: 6px 0 10px; }
+.spark-who { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.btn.spark-card { background: #fff7d6; }
+.sheet-foot .btn.skip { margin-left: auto; }
+
+/* act end, event variants, bag */
+.act-end .lead { font-weight: 800; }
+.variant { color: var(--ink-2); margin: 4px 0; padding-left: 8px; border-left: 3px solid rgba(29, 43, 83, 0.25); }
+.bestiary { margin-top: 10px; padding: 6px 10px; border-left: 4px solid var(--violet); background: #f3ecff; border-radius: 6px; }
+.bag-note { font-weight: 800; color: var(--ink-2); }
+.equip-to .muted.small { align-self: center; margin-right: 2px; }
+
+/* ledger and end screen */
+.ledger-line { font-style: italic; color: var(--ink-2); margin: 2px 0 6px; }
+.unlock, .unlock .pill { color: var(--ink); }
+.turning-point { font-weight: 800; color: var(--ink); background: #fff4e0; border: 2px solid var(--ink); border-radius: 10px; padding: 6px 10px; }
+
+/* map: foe list and the heavy warning */
+.heavy-warn { color: #c1121f; font-weight: 900; }
+.map-foe { white-space: nowrap; }
+
+/* title: the tagline stays readable on a pale sky */
+.tagline { display: inline-block; background: rgba(29, 43, 83, 0.55); padding: 4px 12px; border-radius: 999px; }

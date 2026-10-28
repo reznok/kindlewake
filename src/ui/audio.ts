@@ -98,7 +98,8 @@ export function setMuted(m: boolean) {
 export function isMuted(): boolean { return muted; }
 export function toggleMute(): boolean { setMuted(!muted); return muted; }
 
-export function play(sfx: Sfx) {
+/** Play a sound effect; `rate` pitches it (1.45 = brighter, 0.8 = lower). */
+export function play(sfx: Sfx, rate = 1) {
   if (!soundOn) return;
   log(sfx);
   const a = context();
@@ -107,6 +108,7 @@ export function play(sfx: Sfx) {
     if (!buf || !ac || !sfxBus) return;
     const src = ac.createBufferSource();
     src.buffer = buf;
+    if (rate !== 1) src.playbackRate.value = rate;
     src.connect(sfxBus);
     src.start();
   });

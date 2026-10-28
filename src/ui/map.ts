@@ -1,7 +1,9 @@
 /** Map scene: the act graph on canvas, scrollable, with a DOM top bar. */
 import type { DamageType, MapNode } from '../core/types';
 import { CHARACTERS } from '../data/characters';
-import { COLUMNS, currentNode, describeNode, enterNode, nodeTypes, reachable } from '../engine/run';
+import { ENCOUNTERS } from '../data/encounters';
+import { ENEMIES } from '../data/enemies';
+import { COLUMNS, currentNode, describeNode, enterNode, reachable } from '../engine/run';
 import { memberStats } from '../engine/stats';
 import type { App, Screen } from './app';
 import { music, play } from './audio';
@@ -13,9 +15,22 @@ import { keyDir, isConfirm } from './input';
 import { cap, KIND_COLOR, KIND_GLYPH, TYPE_COLOR } from './palette';
 import { openBag, openMenu, openRelics } from './sheets';
 import { openParty } from './party';
-import { drawActor, drawBackground, drawIcon, FONT_NUM, roundRect } from './sprites';
+import { drawActor, drawBackground, drawHead, drawIcon, FONT_NUM, FONT_UI, roundRect } from './sprites';
 
 let shownAct = '';
+
+/** The foes a node's fight holds, grouped by kind, and whether any of them winds up a heavy. */
+function nodeFoes(n: MapNode): { foes: { def: string; n: number }[]; total: number; heavy: boolean } | null {
+  const enc = n.encounter ? ENCOUNTERS[n.encounter] : undefined;
+  if (!enc) return null;
+  const foes: { def: string; n: number }[] = [];
+  for (const e of enc.enemies) {
+    const f = foes.find((x) => x.def === e.def);
+    if (f) f.n++; else foes.push({ def: e.def, n: 1 });
+  }
+  const heavy = enc.enemies.some((e) => ENEMIES[e.def]?.intents.some((i) => i.kind === 'heavy'));
+  return { foes, total: enc.enemies.length, heavy };
+}
 
 interface Pos { x: number; y: number; r: number }
 
@@ -204,12 +219,18 @@ export class MapScreen implements Screen {
       fill(this.info, el('span.muted', touch ? 'Tap a glowing stop to see it, tap again to go. Drag to scroll.' : 'Click a glowing stop to go. Arrows pick, Enter goes. Drag or wheel to scroll.'));
       return;
     }
-    const types = nodeTypes(n) as DamageType[];
     const can = reachable(this.run).includes(n);
+    // the boss keeps its face hidden until the fight
+    const pack = n.kind !== 'boss' ? nodeFoes(n) : null;
     fill(this.info,
       el('b', { style: { color: KIND_COLOR[n.kind] === '#ffd43b' ? '#b8860b' : KIND_COLOR[n.kind] } }, describeNode(n)),
       n.level ? el('span.muted', ' Lv ' + n.level) : null,
-      types.length ? [el('span', ' • weak to '), types.map((t) => el('span.type-tag', { style: { background: TYPE_COLOR[t] } }, cap(t)))] : null,
+      pack ? pack.foes.map((f) => {
+        const d = ENEMIES[f.def];
+        return el('span.map-foe', ' • ', el('b', (d?.name ?? f.def) + (f.n > 1 ? ' x' + f.n : '')),
+          d?.weak.length ? [' weak to ', (d.weak as DamageType[]).map((t) => el('span.type-tag', { style: { background: TYPE_COLOR[t] } }, cap(t)))] : el('span.muted', ' no weak spot'));
+      }) : null,
+      pack?.heavy ? el('span.heavy-warn', ' • !! hits hard') : null,
       n.done ? el('span.muted', ' • done') : null,
       can ? el('span.go-hint', this.sel === n.id ? ' • tap again / Enter to go' : ' • reachable') : null,
     );
@@ -292,21 +313,9 @@ export class MapScreen implements Screen {
         ctx.beginPath(); ctx.moveTo(p.x - r * 0.5, p.y); ctx.lineTo(p.x - r * 0.1, p.y + r * 0.4); ctx.lineTo(p.x + r * 0.55, p.y - r * 0.45); ctx.stroke();
       }
       ctx.globalAlpha = 1;
-      // weakness dots
-      const types = nodeTypes(n) as DamageType[];
-      if (types.length) {
-        const d = 9, total = types.length * d + (types.length - 1) * 3;
-        let x = p.x - total / 2 + d / 2;
-        ctx.fillStyle = 'rgba(29,43,83,0.55)';
-        roundRect(ctx, p.x - total / 2 - 4, p.y + p.r + 4, total + 8, d + 6, 7);
-        ctx.fill();
-        for (const ty of types) {
-          ctx.fillStyle = TYPE_COLOR[ty];
-          ctx.beginPath(); ctx.arc(x, p.y + p.r + 7 + d / 2, d / 2, 0, Math.PI * 2); ctx.fill();
-          ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
-          x += d + 3;
-        }
-      }
+      // who is in the fight: a head per kind of foe and the head count; "!!" when one of them hits hard
+      const pack = n.kind !== 'boss' && !n.done ? nodeFoes(n) : null;
+      if (pack) this.drawPack(ctx, pack, p);
     }
     // party token
     const cur = at !== null ? this.pos.get(at) : null;
@@ -332,6 +341,45 @@ export class MapScreen implements Screen {
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(this.banner.text, w / 2, h / 2 + 2);
       ctx.restore();
+    }
+  }
+
+  private drawPack(ctx: CanvasRenderingContext2D, pack: NonNullable<ReturnType<typeof nodeFoes>>, p: Pos) {
+    const r = 10, gap = 2;
+    const heads = pack.foes.slice(0, 3);
+    const count = String(pack.total);
+    ctx.font = `9px ${FONT_NUM}`;
+    const cw = ctx.measureText(count).width + 4;
+    const total = heads.length * (r * 2) + (heads.length - 1) * gap + 4 + cw;
+    const y = p.y + p.r + 5 + r;
+    let x = p.x - total / 2 + r;
+    roundRect(ctx, p.x - total / 2 - 4, y - r - 2, total + 8, r * 2 + 4, r + 2);
+    ctx.fillStyle = 'rgba(29,43,83,0.7)';
+    ctx.fill();
+    for (const f of heads) {
+      const d = ENEMIES[f.def];
+      ctx.fillStyle = '#ffd6e0';
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+      if (!d || !drawHead(ctx, d.sprite, x, y, r - 1)) {
+        ctx.fillStyle = '#1d2b53'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.font = `700 12px ${FONT_UI}`;
+        ctx.fillText((d?.name ?? '?')[0], x, y + 1);
+      }
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
+      x += r * 2 + gap;
+    }
+    ctx.font = `9px ${FONT_NUM}`;
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText(count, x - r + 4, y + 1);
+    if (pack.heavy) {
+      const bx = p.x + p.r * 0.75, by = p.y - p.r * 0.8;
+      roundRect(ctx, bx - 2, by - 9, 22, 18, 7);
+      ctx.fillStyle = '#c1121f'; ctx.fill();
+      ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
+      ctx.font = `900 12px ${FONT_UI}`;
+      ctx.fillStyle = '#fff'; ctx.textAlign = 'center';
+      ctx.fillText('!!', bx + 9, by + 1);
     }
   }
 

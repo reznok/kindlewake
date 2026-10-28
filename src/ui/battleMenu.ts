@@ -1,10 +1,11 @@
 /** The DOM command menu for the active hero, with skill / item / swap lists and target picking. */
-import type { ItemInst, TargetMode } from '../core/types';
+import type { DamageType, ItemInst, TargetMode } from '../core/types';
 import { ABILITIES } from '../data/abilities';
 import { ITEMS } from '../data/items';
 import { type BattleAction, type Combatant, alive, commandKey, legalActions, rehearsedFoes } from '../engine/battle';
 import { play } from './audio';
 import type { BattleScene } from './battle';
+import { shown, verdict, VERDICT_TEXT } from './battleView';
 import { btn, el, fill } from './dom';
 import { focusFirst, isConfirm, navKey } from './input';
 import { typeTag } from './portrait';
@@ -83,13 +84,32 @@ export class CommandMenu {
     if (!foes.length || !s.lastCommand) return b;
     const hit = a ? commandKey(s, a) === s.lastCommand : false;
     if (!hit) return b;
-    const hint = `Seen that one: ${foes[0].name} counters a repeated command.`;
+    const hint = `Seen that one: ${foes[0].name} counters a repeat of the last command anyone used (Guard and Swap don't count).`;
     b.classList.add('seen-cmd');
     b.title = hint;
     b.append(el('span.seen', { attrs: { 'aria-label': 'Seen that one' } }, '👁'));
     b.addEventListener('focus', () => this.sc.say(hint, false));
     b.addEventListener('pointerenter', () => this.sc.say(hint, false));
     return b;
+  }
+
+  /** Re-mark the Skill / Item lists after the player taps a different foe. */
+  refreshMarks() {
+    if (this.visible && (this.mode === 'skill' || this.mode === 'item')) this.show(this.mode);
+  }
+
+  /** A WEAK / resist / immune mark for these damage types against the marked foe (null when neutral). */
+  private mark(types: DamageType[], target: TargetMode | undefined): HTMLElement | null {
+    if (target !== 'enemy' && target !== 'enemies' && target !== 'enemyRandom') return null;
+    const foe = this.sc.markFoe(this.hero.id);
+    const v = foe ? verdict(types, shown(this.sc, foe)) : null;
+    return v ? el('span.vd.' + v, VERDICT_TEXT[v]) : null;
+  }
+
+  /** "vs <foe>" for the list header, so the marks say who they are against. */
+  private vsFoe(): string {
+    const foe = this.sc.markFoe(this.hero.id);
+    return foe ? ` vs ${shown(this.sc, foe).name}` : '';
   }
 
   private show(mode: Mode) {
@@ -102,7 +122,7 @@ export class CommandMenu {
     if (mode === 'main') {
       const foes = alive(s.enemies);
       fill(this.root, el('div.cmd-grid',
-        hk(this.seen(btn('Attack', () => this.pickTarget(foes.map((f) => f.id), (id) => ({ t: 'attack', target: id })), 'cmd-btn attack', { data: { default: '' } }), { t: 'attack', target: '' })),
+        hk(this.seen(btn('Attack', () => this.pickTarget(foes.map((f) => f.id), (id) => ({ t: 'attack', target: id }), [this.hero.weapon.type]), 'cmd-btn attack', { data: { default: '' } }), { t: 'attack', target: '' })),
         hk(this.seen(btn('Skill', () => { play('menu'); this.show('skill'); }, 'cmd-btn', { disabled: !legal.skills.length }), legal.skills.find((k) => k.id === s.lastCommand) ? { t: 'skill', id: s.lastCommand! } : null)),
         hk(this.seen(btn('Item', () => { play('menu'); this.show('item'); }, 'cmd-btn', { disabled: !legal.items.length }), legal.items.map((i): BattleAction => ({ t: 'item', item: i.id })).find((a) => commandKey(s, a) === s.lastCommand) ?? null)),
         hk(btn('Guard', () => this.done({ t: 'guard' }), 'cmd-btn')),
@@ -112,20 +132,21 @@ export class CommandMenu {
       const watch = rehearsedFoes(s);
       this.sc.say(watch.length && s.lastCommand ? `${this.hero.name}'s turn. ${watch[0].name} is watching for repeats.` : `${this.hero.name}'s turn.`, false);
     } else if (mode === 'skill') {
-      this.list('Skills', legal.skills.map((k) => {
+      this.list('Skills' + this.vsFoe(), legal.skills.map((k) => {
         const a = ABILITIES[k.id];
         const types = [...new Set((a.hits ?? []).map((h) => h.type))];
-        const b = btn([el('span.li-name', a.name), types.map(typeTag), (a.hits?.length ?? 0) > 1 ? el('span.hits', 'x' + a.hits!.length) : null, el('span.li-cost', { title: 'Moxie (MP)' }, a.mp ? a.mp + ' MP' : 'free')],
-          () => this.useTarget(a.target, (target) => ({ t: 'skill', id: k.id, target })), 'li', { disabled: !k.ok, title: k.why ?? a.desc });
+        const b = btn([el('span.li-name', a.name), types.map(typeTag), (a.hits?.length ?? 0) > 1 ? el('span.hits', 'x' + a.hits!.length) : null, this.mark(types, a.target), el('span.li-cost', { title: 'Moxie (MP)' }, a.mp ? a.mp + ' MP' : 'free')],
+          () => this.useTarget(a.target, (target) => ({ t: 'skill', id: k.id, target }), types), 'li', { disabled: !k.ok, title: k.why ?? a.desc });
         b.addEventListener('focus', () => this.sc.say(a.desc + (k.why ? ' (' + k.why + ')' : ''), false));
         b.addEventListener('pointerenter', () => this.sc.say(a.desc + (k.why ? ' (' + k.why + ')' : ''), false));
         return hk(this.seen(b, { t: 'skill', id: k.id }));
       }));
     } else if (mode === 'item') {
-      this.list('Items', legal.items.map((it: ItemInst) => {
+      this.list('Items' + this.vsFoe(), legal.items.map((it: ItemInst) => {
         const d = ITEMS[it.def];
-        const b = btn([el('span.li-name', d.name), d.use?.hits?.[0] ? typeTag(d.use.hits[0].type) : null, el('span.li-cost', 'x' + it.qty)],
-          () => this.useTarget(d.use!.target, (target) => ({ t: 'item', item: it.id, target })), 'li', { title: d.desc });
+        const types = [...new Set((d.use?.hits ?? []).map((h) => h.type))];
+        const b = btn([el('span.li-name', d.name), d.use?.hits?.[0] ? typeTag(d.use.hits[0].type) : null, this.mark(types, d.use?.target), el('span.li-cost', 'x' + it.qty)],
+          () => this.useTarget(d.use!.target, (target) => ({ t: 'item', item: it.id, target }), types), 'li', { title: d.desc });
         b.addEventListener('focus', () => this.sc.say(d.desc, false));
         b.addEventListener('pointerenter', () => this.sc.say(d.desc, false));
         return hk(this.seen(b, { t: 'item', item: it.id }));
@@ -148,9 +169,9 @@ export class CommandMenu {
   }
 
   /** Decide targets by mode: pick one, or go straight on for group / self modes. */
-  private useTarget(mode: TargetMode, make: (target?: string) => BattleAction) {
+  private useTarget(mode: TargetMode, make: (target?: string) => BattleAction, types: DamageType[] = []) {
     const s = this.sc.state;
-    if (mode === 'enemy') return this.pickTarget(alive(s.enemies).map((c) => c.id), make);
+    if (mode === 'enemy') return this.pickTarget(alive(s.enemies).map((c) => c.id), make, types);
     if (mode === 'ally') return this.pickTarget(alive(s.heroes).map((c) => c.id), make);
     if (mode === 'allyKo') {
       const kos = [...s.heroes, ...s.bench].filter((c) => c.ko);
@@ -165,17 +186,18 @@ export class CommandMenu {
     this.done(make(undefined));
   }
 
-  private async pickTarget(ids: string[], make: (id: string) => BattleAction) {
+  private async pickTarget(ids: string[], make: (id: string) => BattleAction, types?: DamageType[]) {
     if (!ids.length) return;
     const back = this.mode;
     play('menu');
     this.mode = 'target';
     this.hot = [];
     this.root.classList.remove('expanded');
-    fill(this.root, el('div.cmd-target', el('b', 'Pick a target'), el('span.muted', 'Tap one, or arrows + Enter'), btn('Cancel', () => this.sc.cancelTarget(), 'small ghost')));
-    const id = await this.sc.pickTarget(ids, this.hero.id);
+    const touch = matchMedia('(pointer: coarse)').matches;
+    fill(this.root, el('div.cmd-target', el('b', 'Pick a target'), el('span.muted', touch ? 'Tap one. WEAK marks a weak spot.' : 'Tap one, or arrows + Enter'), btn('Cancel', () => this.sc.cancelTarget(), 'small ghost')));
+    const id = await this.sc.pickTarget(ids, this.hero.id, types);
     if (!this.resolve) return;
-    if (id) { this.sc.rememberTarget(this.hero.id, id); this.done(make(id)); }
+    if (id) { this.sc.rememberTarget(this.hero.id, id); if (this.sc.state.enemies.some((e) => e.id === id)) this.sc.focusFoe = id; this.done(make(id)); }
     else { play('menu'); this.show(back === 'target' ? 'main' : back); }
   }
 }

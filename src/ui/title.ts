@@ -1,7 +1,8 @@
 /** Title screen: logo, tagline, Continue / New / Ledger / Story / Settings / Credits. */
+import type { Run } from '../core/types';
 import { CHARACTERS } from '../data/characters';
-import { starters } from '../engine/ledger';
-import { loadRun } from '../engine/save';
+import { recordRun, starters } from '../engine/ledger';
+import { loadRun, saveRun } from '../engine/save';
 import type { App, Screen } from './app';
 import { music, play } from './audio';
 import { frameLoop, Surface } from './canvas';
@@ -10,7 +11,7 @@ import { tagline } from './flavour';
 import { continueRun, toNewRun } from './flow';
 import { showIntro } from './intro';
 import { focusFirst } from './input';
-import { ask, openCredits, openLedger, openSettings } from './sheets';
+import { ask, openCredits, openLedger, openSettings, openUnlocks } from './sheets';
 import { drawActor, drawBackground } from './sprites';
 
 export class TitleScreen implements Screen {
@@ -28,7 +29,11 @@ export class TitleScreen implements Screen {
     const canContinue = !!saved;
     const menu = el('div.title-menu',
       canContinue ? btn('Continue', () => { play('confirm'); continueRun(this.app); }, 'big', { data: { default: '' } }) : null,
-      btn('Begin a new Wake', () => { play('confirm'); if (saved && !saved.over) ask(this.app, 'Begin a new Wake?', 'The Wake in progress will be lost.', 'Start fresh', () => toNewRun(this.app)); else toNewRun(this.app); }, canContinue ? 'big blue' : 'big', { title: 'A Wake is one run' }),
+      btn('Begin a new Wake', () => {
+        play('confirm');
+        if (saved && !saved.over) ask(this.app, 'Begin a new Wake?', 'The Wake in progress ends here and goes in the Ledger.', 'Start fresh', () => this.abandon(saved));
+        else toNewRun(this.app);
+      }, canContinue ? 'big blue' : 'big', { title: 'A Wake is one run' }),
       btn('The Ledger', () => { play('menu'); openLedger(this.app); }, 'ghost'),
       this.app.settings.seenIntro ? btn('Story so far', () => { play('menu'); showIntro(this.app); }, 'ghost') : null,
       btn('Settings', () => { play('menu'); openSettings(this.app); }, 'ghost'),
@@ -47,6 +52,18 @@ export class TitleScreen implements Screen {
     });
     music('title');
     requestAnimationFrame(() => focusFirst(menu));
+  }
+
+  /** "Start fresh" over a Wake in progress: it still counts. Record it in the Ledger, show any unlocks, then begin. */
+  private abandon(run: Run) {
+    run.over = 'lost';
+    run.stats.killedBy = 'giving up';
+    run.pending = null;
+    const fresh = recordRun(this.app.ledger, run);
+    this.app.persistLedger();
+    saveRun(null);
+    if (fresh.length) openUnlocks(this.app, fresh, () => toNewRun(this.app));
+    else toNewRun(this.app);
   }
 
   unmount() { this.stop?.(); this.surf?.destroy(); }

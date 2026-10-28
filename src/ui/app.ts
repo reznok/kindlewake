@@ -44,6 +44,8 @@ export class App {
   auto = false;
   fast = false;
   lastBlow: LastBlow | null = null;
+  /** The biggest foe action of the fight that ended the run, as a lesson line for the end screen. */
+  turningPoint: string | null = null;
 
   constructor(root: HTMLElement) {
     this.root = root;

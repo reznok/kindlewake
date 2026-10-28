@@ -1,4 +1,5 @@
 /** Screen-to-screen flow. Screens call these instead of importing each other. */
+import { restoreBattle, serializeBattle } from '../engine/battle';
 import { newRun, startBattle } from '../engine/run';
 import { loadRun } from '../engine/save';
 import type { App } from './app';
@@ -27,6 +28,7 @@ export function toNewRun(app: App) {
 export function beginRun(app: App, seed: number, picks: string[]) {
   app.run = newRun(seed, picks, app.ledger);
   app.lastBlow = null;
+  app.turningPoint = null;
   app.log('A new Wake begins. Seed ' + seed + '.');
   app.persist();
   toMap(app);
@@ -66,11 +68,21 @@ export function handlePending(app: App) {
   }
 }
 
+/** Start the pending fight, or resume it from its mid-fight save (a reload must not be a free retry). */
 export function toBattle(app: App) {
   const run = app.run!;
-  const state = startBattle(run);
+  const p = run.pending;
+  const saved = p?.kind === 'fight' ? p.battle : undefined;
+  let state = null;
+  if (saved) { try { state = restoreBattle(run, saved); } catch (e) { console.warn('[battle] could not resume', e); } }
+  const resumed = !!state;
+  if (!state) {
+    state = startBattle(run);
+    if (p?.kind === 'fight') p.battle = serializeBattle(state);
+    app.persist();
+  }
   app.battle = state;
-  app.go(new BattleScene(app, state));
+  app.go(new BattleScene(app, state, resumed));
 }
 
 export function toEnd(app: App) {

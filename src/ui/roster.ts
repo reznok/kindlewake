@@ -26,6 +26,8 @@ export class RosterScreen implements Screen {
   constructor(private app: App) {
     this.list = starters(app.ledger).map((id) => CHARACTERS[id]).filter(Boolean);
     this.focus = this.list[0]?.id ?? '';
+    // with only three to choose from, they are already chosen
+    if (this.list.length <= 3) this.picks = this.list.map((c) => c.id);
     this.root = el('div.screen.roster-screen');
     this.seedInput = el<HTMLInputElement>('input.seed', { type: 'text', placeholder: 'random', attrs: { inputmode: 'numeric', 'aria-label': 'Seed', maxlength: '10' } });
     this.begin = btn('Begin', () => this.start(), 'big');
@@ -45,7 +47,7 @@ export class RosterScreen implements Screen {
     }
     const head = el('div.screen-head',
       btn('Back', () => toTitle(this.app), 'ghost small'),
-      el('h2', 'Choose three'),
+      el('h2', this.list.length <= 3 ? 'Your three' : 'Choose three'),
       el('label.seed-label', 'Seed ', this.seedInput),
       this.begin,
     );

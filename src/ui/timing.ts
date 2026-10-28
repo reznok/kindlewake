@@ -35,6 +35,8 @@ export class TimingRunner {
   private timers: number[] = [];
   /** Called as each hit resolves. */
   onGrade: (i: number, g: Grade, w: ActiveWindow) => void = () => {};
+  /** The grade an untapped ring gets (miss; the battle makes it good under Auto). Asked when the ring expires. */
+  fallback: () => Grade = () => 'miss';
 
   /** Run `hits` windows on `targets`; resolves with one grade per hit. */
   run(kind: 'attack' | 'guard', targets: string[], hits: number, sizes: WindowSizes): Promise<Grade[]> {
@@ -54,7 +56,7 @@ export class TimingRunner {
       };
       impacts.forEach((t, i) => {
         if (sizes.auto) this.timers.push(window.setTimeout(() => this.resolve(i, 'good'), t - start));
-        else this.timers.push(window.setTimeout(() => this.resolve(i, 'miss'), t - start + sizes.good + 1));
+        else this.timers.push(window.setTimeout(() => this.resolve(i, this.fallback()), t - start + sizes.good + 1));
       });
     });
   }
