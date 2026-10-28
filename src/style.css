@@ -87,7 +87,7 @@ p { margin: 6px 0; }
 }
 .btn:hover { background: #ffe066; }
 .btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
-.btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; box-shadow: 0 4px 0 var(--ink); }
+.btn:disabled, .btn.disabled { opacity: 0.45; cursor: not-allowed; transform: none; box-shadow: 0 4px 0 var(--ink); }
 .btn:focus-visible, .card:focus-visible, .member-card:focus-visible { outline: 4px solid #fff; outline-offset: 2px; box-shadow: 0 0 0 8px var(--ink), 0 4px 0 var(--ink); }
 .btn.big { min-height: 50px; font-size: 18px; padding: 0 22px; }
 .btn.small { min-height: 44px; padding: 0 12px; font-size: 14px; border-radius: 12px; }
