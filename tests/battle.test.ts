@@ -6,9 +6,9 @@ import { newLedger } from '../src/engine/ledger';
 import { ENCOUNTERS } from '../src/data/encounters';
 
 const ledger = newLedger();
-const starters = ['ph_tank', 'ph_striker', 'ph_mender'];
+const starters = ['barty', 'dell', 'clem'];
 
-function battle(seed = 1, enc = 'ph_a1_1') {
+function battle(seed = 1, enc = 'a1_jam') {
   const run = newRun(seed, starters, ledger);
   return { run, s: createBattle(new Rng(seed), run, ENCOUNTERS[enc]) };
 }
@@ -22,9 +22,9 @@ describe('battle', () => {
   });
 
   it('a weakness hit chips Break and breaks at zero', () => {
-    const { s } = battle(3);
-    // force the striker to act first with a slash weapon against the blob (weak to slash, break 3)
-    const striker = s.heroes.find((h) => h.def === 'ph_striker')!;
+    const { s } = battle(3, 'a1_post');
+    // force the striker to act first with a slash weapon against the first foe (weak to slash, break 3)
+    const striker = s.heroes.find((h) => h.def === 'dell')!;
     for (const c of [...s.heroes, ...s.enemies]) c.tick = 100;
     striker.tick = 0;
     advance(s);
@@ -40,7 +40,7 @@ describe('battle', () => {
   });
 
   it('runs to a result with random legal actions', () => {
-    const { s } = battle(7, 'ph_a1_3');
+    const { s } = battle(7, 'a1_bridge');
     const r = new Rng(9);
     let guard = 0;
     while (!s.over && guard++ < 500) {
@@ -57,16 +57,16 @@ describe('battle', () => {
   });
 
   it('enemy intents cycle through the pattern', () => {
-    const { s } = battle(2, 'ph_a1_1');
+    const { s } = battle(2, 'a1_jam');
     const blob = s.enemies[0];
     const first = nextIntent(blob).id;
-    expect(['bite', 'spit']).toContain(first);
+    expect(['wobble', 'splat', 'preserve']).toContain(first);
   });
 
   it('a KO on the front row pulls in the bench', () => {
     const run = newRun(5, starters, ledger);
-    run.party.push(newMember(run, 'ph_caster'));
-    const s = createBattle(new Rng(5), run, ENCOUNTERS['ph_a1_1']);
+    run.party.push(newMember(run, 'roz'));
+    const s = createBattle(new Rng(5), run, ENCOUNTERS['a1_jam']);
     expect(s.bench.length).toBe(1);
     const victim = s.heroes[0];
     victim.hp = 1;

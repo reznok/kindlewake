@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { Rng } from '../src/core/rng';
-import { newRun, reachable, genMap, COLUMNS, enterNode, chooseEvent, recruit, shopBuy, price, addXp, sparkOffers, pickSpark } from '../src/engine/run';
+import { newRun, reachable, genMap, COLUMNS, enterNode, chooseEvent, eventChoices, canChoose, recruit, shopBuy, price, addXp, sparkOffers, pickSpark } from '../src/engine/run';
 import { newLedger, recordRun, starters } from '../src/engine/ledger';
 import { playRun } from '../src/engine/bot';
 import { xpForLevel } from '../src/engine/stats';
 
 const ledger = newLedger();
-const trio = ['ph_tank', 'ph_striker', 'ph_mender'];
+const trio = ['barty', 'dell', 'clem'];
 
 describe('run', () => {
   it('generates a connected act map with required nodes', () => {
@@ -45,7 +45,8 @@ describe('run', () => {
     enterNode(run, ev.id);
     expect(run.pending?.kind).toBe('event');
     const gold = run.gold;
-    const res = chooseEvent(run, 0);
+    const pick = eventChoices(run).findIndex((c) => canChoose(run, c));
+    const res = chooseEvent(run, pick);
     expect(typeof res.text).toBe('string');
     expect(run.gold === gold || run.gold !== gold).toBe(true);
   });
@@ -53,7 +54,7 @@ describe('run', () => {
   it('recruits up to six and levels new members near the party', () => {
     const run = newRun(8, trio, ledger);
     addXp(run, xpForLevel(5));
-    run.pending = { kind: 'recruit', def: 'ph_caster' };
+    run.pending = { kind: 'recruit', def: 'roz' };
     run.map.at = 0;
     const m = recruit(run, true);
     expect(m).toBeTruthy();
@@ -64,12 +65,12 @@ describe('run', () => {
   it('shops charge and deliver', () => {
     const run = newRun(9, trio, ledger);
     run.gold = 500;
-    run.pending = { kind: 'shop', stock: ['c_potion', 'w_sword'] };
+    run.pending = { kind: 'shop', stock: ['c_potion', 'w_cheese_mallet'] };
     run.map.at = 0;
-    const p = price(run, 'w_sword');
-    expect(shopBuy(run, 'w_sword')).toBe(true);
+    const p = price(run, 'w_cheese_mallet');
+    expect(shopBuy(run, 'w_cheese_mallet')).toBe(true);
     expect(run.gold).toBe(500 - p);
-    expect(run.bag.some((i) => i.def === 'w_sword')).toBe(true);
+    expect(run.bag.some((i) => i.def === 'w_cheese_mallet')).toBe(true);
   });
 
   it('sparks come in pairs and stick', () => {
@@ -90,7 +91,9 @@ describe('run', () => {
     expect(['won', 'lost']).toContain(res.result);
     const fresh = recordRun(l, run);
     expect(l.runs.length).toBe(1);
-    expect(fresh.some((u) => u.id === 'u_first_run')).toBe(true);
-    expect(starters(l)).toContain('ph_caster');
+    // every finished run unlocks a starter on a fresh ledger (one rule for an act-1 loss, another for clearing act 1)
+    if (run.stats.deepestAct === 1 && res.result === 'lost') expect(starters(l)).toContain('roz');
+    else expect(starters(l)).toContain('kit');
+    expect(fresh.length).toBeGreaterThan(0);
   });
 });

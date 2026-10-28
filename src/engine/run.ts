@@ -6,6 +6,7 @@ import { ENCOUNTERS, encounterPool } from '../data/encounters';
 import { eventPool, EVENTS } from '../data/events';
 import { ITEMS } from '../data/items';
 import { RELICS } from '../data/relics';
+import { KITS, UNLOCKS } from '../data/unlocks';
 import { applyToParty, type BattleState, createBattle } from './battle';
 import { recruitable, relicPool } from './ledger';
 import { MAX_LEVEL, memberPassives, memberStats, passivePower, sparkDef, xpForLevel } from './stats';
@@ -43,7 +44,10 @@ export function newRun(seed: number, starters: string[], ledger: Ledger): Run {
     stats: { kills: 0, turns: 0, perfects: 0, breaks: 0, fights: 0, deepestAct: 1, nodes: 0 }, pending: null, over: null, log: [], createdAt: Date.now(), nextId: 1,
   };
   for (const id of starters.slice(0, ACTIVE_MAX)) { if (!CHARACTERS[id]) throw new Error('unknown character ' + id); const m = newMember(run, id); run.party.push(m); run.active.push(m.id); }
-  addItem(run, 'c_potion', 2);
+  // starting lunch: two scones, or an unlocked kit in their place
+  const kits = UNLOCKS.filter((u) => u.kind === 'kit' && ledger.unlocks.includes(u.id)).map((u) => KITS[u.target]).filter(Boolean);
+  if (kits.length) for (const it of kits[kits.length - 1].items) addItem(run, it.id, it.qty);
+  else addItem(run, 'c_potion', 2);
   run.map = withRng(run, (r) => genMap(r, 1, ledger, run));
   return run;
 }

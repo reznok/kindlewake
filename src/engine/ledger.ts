@@ -36,6 +36,8 @@ export function recordRun(ledger: Ledger, run: Run): UnlockDef[] {
   };
   ledger.runs.push(rec);
   for (const m of run.party) ledger.seen['char:' + m.def] = (ledger.seen['char:' + m.def] ?? 0) + 1;
+  for (const f of Object.keys(run.flags)) ledger.seen[f] = (ledger.seen[f] ?? 0) + 1;
+  ledger.seen['act' + run.stats.deepestAct] = (ledger.seen['act' + run.stats.deepestAct] ?? 0) + 1;
   const fresh: UnlockDef[] = [];
   for (const u of UNLOCKS) {
     if (ledger.unlocks.includes(u.id)) continue;

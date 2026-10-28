@@ -10,6 +10,7 @@ import { newRun } from '../src/engine/run';
 import { newLedger } from '../src/engine/ledger';
 import { playRun, type RunResult } from '../src/engine/bot';
 import { CHARACTERS } from '../src/data/characters';
+import { UNLOCKS } from '../src/data/unlocks';
 
 const SIM = !!process.env.SIM;
 const RUNS = +(process.env.RUNS ?? 36);
@@ -26,7 +27,7 @@ describe.skipIf(!SIM)('balance sim', () => {
       const trio = r.shuffle([...starters]).slice(0, 3);
       const ledger = newLedger();
       // simulate a mid-game ledger: everything unlocked so recruits exist
-      ledger.unlocks = ['u_first_run', 'u_act1', 'u_three_runs', 'u_kills', 'u_lucky'];
+      ledger.unlocks = UNLOCKS.map((u) => u.id);
       const run = newRun(seed, trio, ledger);
       results.push(playRun(run, ledger, { timingSkill: SKILL, rng: new Rng(seed * 7) }));
     }
