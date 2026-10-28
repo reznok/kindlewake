@@ -35,6 +35,9 @@
  *     anchor: n                which frame's box anchors a multi-frame sprite (default 0)
  *     face: 1 | -1 | 0         which way the baked frames face (1 right, -1 left, 0 n/a)
  *     fps: { anim: n }         playback hints written to the index
+ * Head crops: { "heads": ["hero_", "mon_"], "prefix"?: "head_" } (list it last) adds a 32 px square head crop
+ *   `head_<key>` for every earlier sprite whose key starts with a prefix (see makeHead); a sprite can tune its own crop
+ *   with "headCrop": { "frac", "top", "fit" }; the entry's own "head" sets defaults.
  * Output: <out>.png and <out>.json:
  *   { width, height, frames: { "<key>:<anim>:<i>": { x, y, w, h, ox, oy, cw, ch, px } },
  *     sprites: { "<key>": { face, cw, ch, anims: { idle: n, ... }, fps, smooth } } }   (smooth: painterly, draw filtered)
@@ -47,7 +50,7 @@ import { PNG } from 'pngjs';
 const manifestPath = process.argv[2] ?? 'tools/manifest.json';
 const outBase = process.argv[3] ?? 'public/atlas';
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-const SIZES = { small: [80, 80], medium: [128, 128], large: [200, 200], icon: [16, 16], portrait: [96, 96] };
+const SIZES = { small: [80, 80], medium: [128, 128], large: [200, 200], icon: [16, 16], portrait: [96, 96], head: [32, 32] };
 
 const cache = new Map();
 function load(file) {
@@ -203,6 +206,53 @@ function applyOverlays(img, o, dir) {
   return out;
 }
 
+/** Processed idle frame 0 of an already-built sprite, mirrored like the atlas copy. */
+function sourceFrame(key, who) {
+  const src = built.get(key);
+  if (!src) throw new Error(`${who}: source ${key} not built yet (list it earlier in the manifest)`);
+  const img = src.list.find((f) => f.anim === 'idle' && f.i === 0)?.img ?? src.list[0].img;
+  return src.o.flip ? flipX(img) : img;
+}
+
+/**
+ * A square head crop (head size, px 1) for timeline circles and map pins: the top of the idle frame, centred on the
+ * head's opaque columns, nearest-upscaled by an integer (or area-downscaled) to fit, transparent around the art.
+ * head: { from, frac?: 0.75 (crop side as a share of the art's shorter side), top?: 0 (rows to skip),
+ *         fit?: true (whole creature instead: side = frac (0.9) of the longer side, centred on the art) }
+ */
+function makeHead(o, cell) {
+  const spec = o.head;
+  const base = sourceFrame(spec.from, o.key);
+  const b = bbox(base);
+  const [W, H] = cell;
+  const out = new PNG({ width: W, height: H });
+  out.data.fill(0);
+  if (!b) return out;
+  let side, top, cx;
+  if (spec.fit) {
+    // whole creature: a square around the art box (top-aligned when tall, centred when wide)
+    side = Math.max(6, Math.round(Math.max(b.w, b.h) * (spec.frac ?? 0.9)));
+    top = (b.h >= side ? b.y : Math.round(b.y + b.h / 2 - side / 2)) + (spec.top ?? 0);
+    cx = b.x + b.w / 2;
+  } else {
+    side = Math.max(6, Math.round(Math.min(b.w, b.h) * (spec.frac ?? 0.75)));
+    top = b.y + (spec.top ?? 0);
+    let sum = 0, n = 0;
+    for (let y = top; y < Math.min(b.y + b.h, top + Math.max(3, Math.round(side * 0.6))); y++) {
+      for (let x = b.x; x < b.x + b.w; x++) if (base.data[(y * base.width + x) * 4 + 3] > 8) { sum += x; n++; }
+    }
+    cx = n ? sum / n : b.x + b.w / 2;
+  }
+  const sq = new PNG({ width: side, height: side });
+  sq.data.fill(0);
+  blit(base, sq, -Math.round(cx - side / 2), -top);
+  let img;
+  if (side <= W) img = grow(sq, Math.max(1, Math.floor(W / side)));
+  else img = resample(sq, W, H);
+  blit(img, out, Math.floor((W - img.width) / 2), Math.floor((H - img.height) / 2));
+  return out;
+}
+
 /** A framed portrait bust from another sprite's processed idle frame (see the header). */
 function makeBust(o, cell) {
   const spec = o.bust;
@@ -300,7 +350,13 @@ const spritesIdx = {};
 const built = new Map(); // key -> { o, list } processed frames, for busts
 
 // { "glob": "dir", "prefix": "icon_", ...ops } adds one sprite per PNG in dir
-const spriteList = (manifest.sprites ?? []).flatMap((s) => {
+const spriteList = (manifest.sprites ?? []).flatMap((s, i, all) => {
+  if (s.heads) {
+    // { "heads": ["hero_", "mon_"], "prefix": "head_" }: one head crop per earlier sprite whose key starts with a prefix
+    const { heads, prefix = 'head_', ...rest } = s;
+    return all.slice(0, i).filter((e) => e.key && heads.some((h) => e.key.startsWith(h)))
+      .map((e) => ({ size: 'head', ...rest, key: prefix + e.key, head: { from: e.key, ...(s.head ?? {}), ...(e.headCrop ?? {}) } }));
+  }
   if (!s.glob) return [s];
   const d = resolveDir(s.glob);
   if (!fs.existsSync(d)) throw new Error('missing dir ' + d + ' (run tools/build-icons.mjs first?)');
@@ -314,6 +370,11 @@ for (const raw of spriteList) {
   const o = { ...(manifest.groups?.[raw.group] ?? {}), ...raw };
   const dir = o.dir ?? '';
   const cell = o.cell ?? SIZES[o.size ?? 'medium'];
+  if (o.head) {
+    frames.push({ key: `${o.key}:idle:0`, img: makeHead(o, cell), ox: 0, oy: 0, px: 1 });
+    spritesIdx[o.key] = { face: built.get(o.head.from)?.o.face ?? 0, cw: cell[0], ch: cell[1], anims: { idle: 1 } };
+    continue;
+  }
   if (o.bust) {
     frames.push({ key: `${o.key}:idle:0`, img: makeBust(o, cell), ox: 0, oy: 0, px: 1 });
     spritesIdx[o.key] = { face: 0, cw: cell[0], ch: cell[1], anims: { idle: 1 } };

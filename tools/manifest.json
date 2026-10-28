@@ -251,12 +251,15 @@
     { "key": "mon_boss_moth_rider", "group": "l", "scale": 2, "tint": "a9a9b8", "src": "@m50n/Monster #7 Front Normal Color Palette.png",
       "overlay": [{ "src": { "file": "@necro", "x": 21, "y": 16, "w": 15, "h": 18 }, "dx": 27, "dy": 0,
                     "recolor": { "b43eff": "8a5a3c", "7d2bb1": "5e3a26", "3b1255": "3a2418" } }] },
-    { "key": "mon_odo", "group": "m", "bgKey": "f551ff", "keyAll": true, "tol": 4, "src": { "file": "@musket", "x": 4, "y": 1, "w": 20, "h": 25 },
+    { "key": "mon_odo", "group": "m", "headCrop": { "fit": false }, "bgKey": "f551ff", "keyAll": true, "tol": 4, "src": { "file": "@musket", "x": 4, "y": 1, "w": 20, "h": 25 },
       "recolor": { "3e9ada": "d9a521", "4665c8": "9c6d12", "ffce15": "fff0a8", "eb442a": "e07b22", "ac321f": "a04a12", "a9b1fe": "d8d8d0" } },
     { "key": "mon_boss_duskmother", "group": "l", "scale": 3, "tint": "7d86b4", "src": "@m50n/Monster #7 Front Normal Color Palette.png" },
     { "key": "mon_jam_colossus", "group": "l", "scale": 3, "tint": "ff4566", "bright": [1.08, 1.1], "src": { "file": "@slimes", "x": 48, "y": 47, "w": 32, "h": 33 },
       "overlay": [{ "src": { "file": "@town", "x": 64, "y": 0, "w": 16, "h": 32 }, "scale": 2, "dx": 4, "dy": -26, "under": true },
                   { "src": { "file": "@town", "x": 80, "y": 0, "w": 16, "h": 16 }, "scale": 2, "dx": 44, "dy": -10, "under": true },
-                  { "src": { "file": "@town", "x": 64, "y": 32, "w": 16, "h": 16 }, "scale": 2, "dx": 26, "dy": -16, "under": true }] }
+                  { "src": { "file": "@town", "x": 64, "y": 32, "w": 16, "h": 16 }, "scale": 2, "dx": 26, "dy": -16, "under": true }] },
+
+    { "heads": ["hero_"], "prefix": "head_" },
+    { "heads": ["mon_"], "prefix": "head_", "head": { "fit": true } }
   ]
 }

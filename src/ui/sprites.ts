@@ -278,11 +278,21 @@ export function drawPortrait(ctx: CanvasRenderingContext2D, spriteKey: string, x
 /** A round head-shot for the turn timeline: portrait if there is one, else the idle frame fitted into the circle. */
 export function drawHead(ctx: CanvasRenderingContext2D, key: string, cx: number, cy: number, r: number): boolean {
   const meta = atlas ? index.sprites[key] : undefined;
-  const por = atlas ? index.sprites[portraitKey(key)] : undefined;
-  if (!meta && !por) return false;
+  const headMeta = atlas ? index.sprites[`head_${key}`] : undefined;
+  const head = headMeta ? index.frames[`head_${key}:idle:0`] : undefined;
+  const por = atlas && key.startsWith('hero_') ? index.sprites[portraitKey(key)] : undefined;
+  if (!meta && !por && !head) return false;
   ctx.save();
   ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.clip();
-  if (por) drawPortrait(ctx, key, cx - r * 1.25, cy - r * 1.15, r * 2.5);
+  if (head && headMeta && atlas) {
+    // a dedicated head crop: fill the circle
+    const aw = head.w * head.px, ah = head.h * head.px;
+    const k = (r * 2.1) / Math.max(aw, ah);
+    ctx.imageSmoothingEnabled = !!headMeta.smooth;
+    ctx.translate(cx, cy);
+    if (headMeta.face === -1) ctx.scale(-1, 1);
+    ctx.drawImage(atlas, head.x, head.y, head.w, head.h, -aw * k / 2, -ah * k / 2, aw * k, ah * k);
+  } else if (por) drawPortrait(ctx, key, cx - r * 1.25, cy - r * 1.15, r * 2.5);
   else if (meta) {
     const fr = index.frames[`${key}:idle:0`];
     if (fr && atlas) {
