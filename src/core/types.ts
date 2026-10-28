@@ -252,7 +252,7 @@ export interface MapNode {
 
 export interface ActMap { act: 1 | 2 | 3; nodes: MapNode[]; at: number | null }
 
-export interface RunStats { kills: number; turns: number; perfects: number; breaks: number; fights: number; killedBy?: string; deepestAct: number }
+export interface RunStats { kills: number; turns: number; perfects: number; breaks: number; fights: number; killedBy?: string; deepestAct: number; nodes: number }
 
 export interface Run {
   seed: number;

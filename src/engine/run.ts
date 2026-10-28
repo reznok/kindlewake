@@ -1,6 +1,6 @@
 /** Run-level logic: map generation, node resolution, rewards, growth, party and bag management. Pure; no DOM. */
 import { Rng, hashString } from '../core/rng';
-import type { ActMap, EncounterDef, ItemInst, Ledger, MapNode, NodeKind, Outcome, PartyMember, Run, SparkDef, StatKey } from '../core/types';
+import type { ActMap, EncounterDef, EventChoice, ItemInst, Ledger, MapNode, NodeKind, Outcome, PartyMember, Run, SparkDef, StatKey } from '../core/types';
 import { CHARACTERS } from '../data/characters';
 import { ENCOUNTERS, encounterPool } from '../data/encounters';
 import { eventPool, EVENTS } from '../data/events';
@@ -40,7 +40,7 @@ export function newMember(run: Run, def: string, level = 1): PartyMember {
 export function newRun(seed: number, starters: string[], ledger: Ledger): Run {
   const run: Run = {
     seed, rng: new Rng(seed).s, act: 1, map: { act: 1, nodes: [], at: null }, party: [], active: [], gold: 40, bag: [], relics: [], flags: {},
-    stats: { kills: 0, turns: 0, perfects: 0, breaks: 0, fights: 0, deepestAct: 1 }, pending: null, over: null, log: [], createdAt: Date.now(), nextId: 1,
+    stats: { kills: 0, turns: 0, perfects: 0, breaks: 0, fights: 0, deepestAct: 1, nodes: 0 }, pending: null, over: null, log: [], createdAt: Date.now(), nextId: 1,
   };
   for (const id of starters.slice(0, ACTIVE_MAX)) { if (!CHARACTERS[id]) throw new Error('unknown character ' + id); const m = newMember(run, id); run.party.push(m); run.active.push(m.id); }
   addItem(run, 'c_potion', 2);
@@ -132,6 +132,7 @@ export function enterNode(run: Run, id: number): MapNode {
   const n = run.map.nodes[id];
   if (!reachable(run).includes(n)) throw new Error('node not reachable');
   run.map.at = id;
+  run.stats.nodes++;
   switch (n.kind) {
     case 'fight': case 'elite': case 'boss': run.pending = { kind: 'fight', encounter: n.encounter!, from: 'node' }; break;
     case 'event': run.pending = { kind: 'event', event: n.event! }; break;
@@ -201,8 +202,8 @@ export function finishBattle(run: Run, s: BattleState) {
     else if (r.chance(0.35 + lucky * 0.2)) items.push(r.pick(Object.values(ITEMS).filter((i) => (i.tier ?? 1) <= run.act && (i.kind === 'consumable' || r.chance(0.3 + lucky * 0.2))).map((i) => i.id)));
     if (enc.elite || enc.boss) { const pool = r.shuffle(relicPool(LEDGER_FOR_POOL(run), run)); relics.push(...pool.slice(0, 3)); }
   });
-  for (const id of items) addItem(run, id, 1);
-  run.pending = { kind: 'reward', gold, items, relics: relics.length ? relics : undefined, xp, levelUps };
+  const kept = items.filter((id) => addItem(run, id, 1));
+  run.pending = { kind: 'reward', gold, items: kept, relics: relics.length ? relics : undefined, xp, levelUps };
 }
 
 // data accessors kept local so the engine does not import the enemy table twice
@@ -380,6 +381,33 @@ export function shopBuy(run: Run, defId: string): boolean {
   return true;
 }
 
+export function leaveShop(run: Run) { if (run.pending?.kind === 'shop') finishNode(run); }
+
+/** Use a consumable outside battle (heal, MP, revive, cleanse). Damage items are battle-only. */
+export function useItemField(run: Run, instId: string, memberId: string): boolean {
+  const inst = run.bag.find((i) => i.id === instId);
+  const def = inst && ITEMS[inst.def];
+  const m = run.party.find((x) => x.id === memberId);
+  if (!inst || !def?.use || !m || inst.qty <= 0) return false;
+  const st = memberStats(m, run);
+  let used = false;
+  for (const e of def.use.effects ?? []) {
+    if (e.kind === 'heal' && m.hp > 0 && m.hp < st.hp) { m.hp = Math.min(st.hp, m.hp + (e.scale === 'flat' ? e.power : Math.round(st.mag * e.power / 100))); used = true; }
+    if (e.kind === 'mp' && m.mp < st.mp) { m.mp = Math.min(st.mp, m.mp + e.amount); used = true; }
+    if (e.kind === 'revive' && m.hp <= 0) { m.hp = Math.max(1, Math.round(st.hp * e.fraction)); used = true; }
+    if (e.kind === 'cleanse') used = true;
+  }
+  if (!used) return false;
+  inst.qty--;
+  if (inst.qty <= 0) run.bag.splice(run.bag.indexOf(inst), 1);
+  return true;
+}
+
+export function canUseField(def: string): boolean {
+  const u = ITEMS[def]?.use;
+  return !!u && !u.hits && !!u.effects?.some((e) => e.kind === 'heal' || e.kind === 'mp' || e.kind === 'revive');
+}
+
 // ---------------------------------------------------------------- camp
 
 export function campHeal(run: Run) {
@@ -411,11 +439,24 @@ export function campForge(run: Run, memberId: string): boolean {
 
 // ---------------------------------------------------------------- events
 
+/** Choices visible for the pending event (flag-gated ones hidden). */
+export function eventChoices(run: Run): EventChoice[] {
+  if (run.pending?.kind !== 'event') return [];
+  return EVENTS[run.pending.event].choices.filter((c) => !c.requires || run.flags[c.requires]);
+}
+
+/** A choice that costs gold needs the gold. */
+export function canChoose(run: Run, c: EventChoice): boolean {
+  const cost = c.outcomes.filter((o) => o.kind === 'gold' && o.amount < 0).reduce((a, o) => a + (o.kind === 'gold' ? -o.amount : 0), 0);
+  return run.gold >= cost;
+}
+
 export function chooseEvent(run: Run, choice: number): { text: string; fight: boolean } {
   if (run.pending?.kind !== 'event') throw new Error('no event pending');
   const ev = EVENTS[run.pending.event];
-  const ch = ev.choices.filter((c) => !c.requires || run.flags[c.requires])[choice];
+  const ch = eventChoices(run)[choice];
   if (!ch) throw new Error('bad choice');
+  if (!canChoose(run, ch)) throw new Error('cannot afford');
   run.flags['event:' + ev.id] = true;
   const branch = ch.gamble && withRng(run, (r) => r.chance(ch.gamble!.chance)) ? ch.gamble : ch;
   let fight = false;
