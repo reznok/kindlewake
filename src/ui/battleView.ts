@@ -9,7 +9,7 @@ import { star } from './fx';
 
 export interface Box { x: number; y: number; w: number; h: number; cx: number; cy: number; side: 'hero' | 'enemy' }
 
-export interface Vis { hp: number; mp: number; brk: number; ox: number; oy: number; flash: number; alpha: number; anim?: Anim; animAt?: number }
+export interface Vis { hp: number; mp: number; brk: number; ox: number; oy: number; flash: number; alpha: number; anim?: Anim; animAt?: number; facing?: 1 | -1 }
 
 export const TOP_H = 46;
 
@@ -147,7 +147,8 @@ function drawEnemy(sc: BattleScene, ctx: CanvasRenderingContext2D, c: Combatant,
     ctx.fillStyle = 'rgba(255,90,90,0.35)';
     ctx.beginPath(); ctx.ellipse(b.cx + v.ox, b.y + b.h, b.w * 0.6, b.h * 0.14, 0, 0, Math.PI * 2); ctx.fill();
   }
-  drawActor(ctx, c.sprite, x, y, b.w, b.h, { label: c.name, flash: v.flash, facing: 1, broken: c.broken, time: t, ko: c.ko, anim: v.anim, animAt: v.animAt });
+  // routed foes run off upright (see BattleScene.scarper) instead of tipping over
+  drawActor(ctx, c.sprite, x, y, b.w, b.h, { label: c.name, flash: v.flash, facing: v.facing ?? 1, broken: c.broken && !c.ko, time: t, anim: v.anim, animAt: v.animAt });
   if (!c.ko) {
     // intent pill
     const plan = sc.state.plan && sc.state.actor === c.id ? sc.state.plan.intent : null;

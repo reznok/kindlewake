@@ -7,6 +7,7 @@ import type { App, Screen } from './app';
 import { music, play } from './audio';
 import { frameLoop, Surface } from './canvas';
 import { bar, btn, el, fill } from './dom';
+import { tip } from './flavour';
 import { handlePending } from './flow';
 import { keyDir, isConfirm } from './input';
 import { cap, KIND_COLOR, KIND_GLYPH, TYPE_COLOR } from './palette';
@@ -33,6 +34,8 @@ export class MapScreen implements Screen {
   private worldW = 0;
   private banner: { text: string; until: number } | null = null;
   private scrolled = false;
+  /** Now and then the idle bottom line carries a tip instead of the controls hint. */
+  private tip: string | null = null;
 
   constructor(private app: App) {
     this.root = el('div.screen.map-screen');
@@ -51,6 +54,9 @@ export class MapScreen implements Screen {
     c.addEventListener('pointercancel', () => { this.drag = null; });
     c.addEventListener('pointerleave', () => { this.hover = null; this.updateInfo(); });
     c.addEventListener('wheel', (e) => { this.scroll += (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY); this.clamp(); e.preventDefault(); }, { passive: false });
+    // never on the very first map of a first Wake, where the controls hint matters most
+    const veteran = this.app.ledger.runs.length > 0 || this.run.map.at !== null;
+    this.tip = veteran && Math.random() < 0.45 ? tip() : null;
     const key = this.run.seed + ':' + this.run.act;
     if (shownAct !== key) { shownAct = key; this.banner = { text: 'Act ' + this.run.act, until: performance.now() + 1600 }; }
     this.stop = frameLoop((t) => this.draw(t));
@@ -72,12 +78,12 @@ export class MapScreen implements Screen {
     });
     fill(this.top,
       el('div.chip.act', 'Act ' + Math.min(3, run.act)),
-      el('div.chip.gold', { title: 'Gold' }, el('span.coin'), String(run.gold)),
+      el('div.chip.gold', { title: 'Buttons (gold)' }, el('span.coin'), String(run.gold)),
       el('div.hp-sum', hp),
       el('div.spacer'),
       btn(['Party', sparks ? el('span.badge', String(sparks)) : null], () => { play('menu'); openParty(this.app); }, 'small'),
       btn('Bag', () => { play('menu'); openBag(this.app); }, 'small ghost'),
-      btn('Relics', () => { play('menu'); openRelics(this.app); }, 'small ghost'),
+      btn('Keepsakes', () => { play('menu'); openRelics(this.app); }, 'small ghost', { title: 'Relics' }),
       btn('Menu', () => { play('menu'); openMenu(this.app); }, 'small ghost'),
     );
     if (this.sel !== null && !reachable(run).some((n) => n.id === this.sel)) this.sel = null;
@@ -194,6 +200,7 @@ export class MapScreen implements Screen {
     const n = id !== null ? this.run.map.nodes[id] : null;
     if (!n) {
       const touch = matchMedia('(pointer: coarse)').matches;
+      if (this.tip) { fill(this.info, el('span.muted', el('b', 'Tip: '), this.tip)); return; }
       fill(this.info, el('span.muted', touch ? 'Tap a glowing stop to see it, tap again to go. Drag to scroll.' : 'Click a glowing stop to go. Arrows pick, Enter goes. Drag or wheel to scroll.'));
       return;
     }

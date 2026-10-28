@@ -1,4 +1,4 @@
-/** Title screen: logo, Continue / New run / Ledger / Settings / Credits. */
+/** Title screen: logo, tagline, Continue / New / Ledger / Story / Settings / Credits. */
 import { CHARACTERS } from '../data/characters';
 import { starters } from '../engine/ledger';
 import { loadRun } from '../engine/save';
@@ -6,7 +6,9 @@ import type { App, Screen } from './app';
 import { music, play } from './audio';
 import { frameLoop, Surface } from './canvas';
 import { btn, el } from './dom';
-import { continueRun, toRoster } from './flow';
+import { tagline } from './flavour';
+import { continueRun, toNewRun } from './flow';
+import { showIntro } from './intro';
 import { focusFirst } from './input';
 import { ask, openCredits, openLedger, openSettings } from './sheets';
 import { drawActor, drawBackground } from './sprites';
@@ -26,12 +28,13 @@ export class TitleScreen implements Screen {
     const canContinue = !!saved;
     const menu = el('div.title-menu',
       canContinue ? btn('Continue', () => { play('confirm'); continueRun(this.app); }, 'big', { data: { default: '' } }) : null,
-      btn('New run', () => { play('confirm'); if (saved && !saved.over) ask(this.app, 'Start a new run?', 'The saved run will be lost.', 'Start fresh', () => toRoster(this.app)); else toRoster(this.app); }, canContinue ? 'big blue' : 'big'),
-      btn('Ledger', () => { play('menu'); openLedger(this.app); }, 'ghost'),
+      btn('Begin a new Wake', () => { play('confirm'); if (saved && !saved.over) ask(this.app, 'Begin a new Wake?', 'The Wake in progress will be lost.', 'Start fresh', () => toNewRun(this.app)); else toNewRun(this.app); }, canContinue ? 'big blue' : 'big', { title: 'A Wake is one run' }),
+      btn('The Ledger', () => { play('menu'); openLedger(this.app); }, 'ghost'),
+      this.app.settings.seenIntro ? btn('Story so far', () => { play('menu'); showIntro(this.app); }, 'ghost') : null,
       btn('Settings', () => { play('menu'); openSettings(this.app); }, 'ghost'),
       btn('Credits', () => { play('menu'); openCredits(this.app); }, 'ghost'),
     );
-    const logo = el('div.logo', el('h1', 'Kindlewake'), el('p.tagline', 'a party RPG of timed hits and bad decisions'));
+    const logo = el('div.logo', el('h1', 'Kindlewake'), el('p.tagline', tagline(this.app.ledger)));
     const art = el('div.title-art');
     this.root.replaceChildren(art, el('div.title-front', logo, menu), el('div.title-foot', 'Press ? for keys'));
     this.surf = new Surface(art);

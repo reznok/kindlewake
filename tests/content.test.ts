@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { DAMAGE_TYPES, ROLES, type AbilityDef, type Effect, type Outcome } from '../src/core/types';
 import { ABILITIES, CHARACTERS, ENCOUNTERS, ENEMIES, EVENTS, ITEMS, RELICS, UNLOCKS, KITS, DEATH_QUIPS, CAMP_SCENES, SHOP, ELITE_BARKS, INTRO, TIPS, TAGLINES, deathQuip, encounterPool } from '../src/data';
@@ -6,6 +7,8 @@ const chars = Object.values(CHARACTERS);
 const enemies = Object.values(ENEMIES);
 const act1 = enemies.filter((e) => e.id.startsWith('a1_'));
 const act1Normal = act1.filter((e) => !e.elite && !e.boss);
+/** Sprite keys shipped in the atlas. */
+const atlasSprites = new Set(Object.keys(JSON.parse(readFileSync(new URL('../public/atlas.json', import.meta.url), 'utf8')).sprites as Record<string, unknown>));
 
 /** Every ability id a character can ever use (starting four plus spark grants and replacements). */
 function heroAbilityIds(): string[] {
@@ -119,7 +122,7 @@ describe('content tables', () => {
 
   it('enemies keep sprite and reward conventions; one rehearsed foe; the boss reshapes', () => {
     for (const e of act1) {
-      expect(e.sprite).toBe('en_' + e.id);
+      expect(atlasSprites.has(e.sprite), e.id + ' sprite ' + e.sprite).toBe(true);
       if (!e.elite && !e.boss) { expect(e.xp).toBeGreaterThanOrEqual(6); expect(e.xp).toBeLessThanOrEqual(10); }
     }
     expect(act1Normal.length).toBe(16);
@@ -127,7 +130,9 @@ describe('content tables', () => {
     expect(act1.filter((e) => e.passives?.some((p) => p.id === 'rehearsed')).map((e) => e.id)).toEqual(['a1_nocturne']);
     const boss = act1.find((e) => e.boss)!;
     expect(boss.phases?.length).toBe(2);
-    for (const p of boss.phases!) { expect(p.name).toBeTruthy(); expect(p.sprite).toBeTruthy(); expect(p.weak?.length).toBeGreaterThan(0); }
+    for (const p of boss.phases!) { expect(p.name).toBeTruthy(); expect(atlasSprites.has(p.sprite!)).toBe(true); expect(p.weak?.length).toBeGreaterThan(0); }
+    // the three shapes are three different sprites
+    expect(new Set([boss.sprite, ...boss.phases!.map((p) => p.sprite)]).size).toBe(3);
     // heavies are telegraphed: the previous step of the loop is a charge, wait, heal (lure) or buff
     for (const e of act1) {
       for (const pat of [e.pattern, ...(e.phases ?? []).map((p) => p.pattern)]) {

@@ -11,6 +11,7 @@ import { play } from './audio';
 import { btn, el } from './dom';
 import { toEnd, toTitle } from './flow';
 import { helpSheet } from './help';
+import { showIntro } from './intro';
 import { typeTag } from './portrait';
 import { Sheet } from './sheet';
 
@@ -40,8 +41,8 @@ export function openBag(app: App): Sheet {
 
 export function openRelics(app: App): Sheet {
   const run = app.run!;
-  const s = new Sheet(app, { title: `Relics ${run.relics.length}/${RELIC_MAX}` });
-  s.fill([run.relics.length ? el('div.shop-list', run.relics.map((id) => el('div.shop-row', el('div.shop-info', el('b', RELICS[id].name), el('div.muted', RELICS[id].desc))))) : el('p.muted', 'No relics yet. Elites, events and shops have them.')]);
+  const s = new Sheet(app, { title: `Keepsakes ${run.relics.length}/${RELIC_MAX}` });
+  s.fill([run.relics.length ? el('div.shop-list', run.relics.map((id) => el('div.shop-row', el('div.shop-info', el('b', RELICS[id].name), el('div.muted', RELICS[id].desc))))) : el('p.muted', 'No keepsakes (relics) yet. Bigwigs, happenstances and shops have them.')]);
   return s.open();
 }
 
@@ -51,8 +52,9 @@ export function openMenu(app: App): Sheet {
     btn('Resume', () => s.close(), 'big', { data: { default: '' } }),
     btn('Settings', () => openSettings(app)),
     btn('How to play', () => helpSheet(app)),
+    btn('Story so far', () => { s.close(); showIntro(app); }),
     btn('Save and quit to title', () => { app.persist(); toTitle(app); }, 'ghost'),
-    app.run ? btn('Abandon run', () => ask(app, 'Abandon run?', 'The run ends here and goes in the Ledger.', 'Abandon', () => {
+    app.run ? btn('Abandon this Wake', () => ask(app, 'Abandon this Wake?', 'The Wake ends here and goes in the Ledger.', 'Abandon', () => {
       const run = app.run!;
       run.over = 'lost';
       run.stats.killedBy = 'giving up';
@@ -77,7 +79,7 @@ export function openSettings(app: App): Sheet {
       toggle('music', 'Music'),
       toggle('shake', 'Screen shake'),
       el('div.setting', el('span', 'Timing window'), el('div.seg', timing('normal', 'Normal'), timing('wide', 'Wide'), timing('auto', 'Auto'))),
-      el('p.muted.small', st.timing === 'auto' ? 'Auto: every hit and guard scores Good, never Perfect. No rings.' : st.timing === 'wide' ? 'Wide: windows are twice as long.' : 'Normal: Perfect within ~80 ms, Good within ~220 ms.'),
+      el('p.muted.small', st.timing === 'auto' ? 'Auto: every hit and guard scores Warm (good), never Bright (perfect). No rings.' : st.timing === 'wide' ? 'Wide: windows are twice as long.' : 'Normal: Bright (perfect) within ~80 ms, Warm (good) within ~220 ms.'),
     ]);
   };
   render();
@@ -86,7 +88,7 @@ export function openSettings(app: App): Sheet {
 
 export function openLedger(app: App): Sheet {
   const l = app.ledger;
-  const s = new Sheet(app, { title: 'Ledger', cls: 'wide' });
+  const s = new Sheet(app, { title: 'The Ledger', cls: 'wide' });
   const runs = [...l.runs].reverse().slice(0, 30);
   s.fill([
     el('h4', 'Unlocks'),
@@ -94,15 +96,15 @@ export function openLedger(app: App): Sheet {
       const got = l.unlocks.includes(u.id);
       return el('div.unlock' + (got ? '.got' : ''), el('b', got ? u.name : '???'), el('span.muted', ' ' + u.desc), got ? el('span.pill.good', u.kind) : null);
     })),
-    el('h4', `Runs (${l.runs.length})`),
-    runs.length ? el('table.runs', el('tr', el('th', 'When'), el('th', 'Result'), el('th', 'Act'), el('th', 'Party'), el('th', 'Ended by')),
+    el('h4', `Wakes (${l.runs.length})`),
+    runs.length ? el('table.runs', el('tr', el('th', 'When'), el('th', 'Result'), el('th', 'Act'), el('th', 'Party'), el('th', 'Routed by')),
       runs.map((r) => el('tr',
         el('td', new Date(r.when).toLocaleDateString()),
         el('td', el('span.pill' + (r.result === 'won' ? '.good' : '.bad'), r.result)),
         el('td', String(r.act)),
         el('td', r.party.map((p) => CHARACTERS[p]?.name ?? p).join(', ')),
         el('td', r.killedBy ?? '-'),
-      ))) : el('p.muted', 'No runs yet. Go make some history.'),
+      ))) : el('p.muted', 'No Wakes yet. Sign the book.'),
   ]);
   return s.open();
 }

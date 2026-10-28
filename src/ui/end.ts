@@ -7,9 +7,11 @@ import { saveRun } from '../engine/save';
 import type { UnlockDef } from '../data/unlocks';
 import type { App, Screen } from './app';
 import { music, play } from './audio';
-import { btn, el } from './dom';
+import { btn, el, rich } from './dom';
 import { toTitle } from './flow';
+import { endQuip, tip } from './flavour';
 import { portrait } from './portrait';
+import { DEATH_HEADER } from '../data/text';
 
 const recorded = new WeakMap<Run, UnlockDef[]>();
 
@@ -39,18 +41,21 @@ export class EndScreen implements Screen {
     const stat = (k: string, v: string | number) => el('div.stat', el('span.k', k), el('span.v', String(v)));
     const done = run.map.nodes.filter((n) => n.done).length;
     const inner = el('div.end-inner',
-      el('h1.end-title' + (won ? '.won' : ''), won ? 'Victory!' : 'Run over'),
-      won ? el('p', 'The party made it all the way. Remarkable.') : el('p', 'Ended by ', el('b', st.killedBy ?? 'misadventure'), ` in act ${st.deepestAct}.`),
+      el('h1.end-title' + (won ? '.won' : ''), won ? 'Victory!' : DEATH_HEADER),
+      won ? el('p', 'The Kindling made it all the way. Remarkable.') : [
+        el('p.end-quip', rich(endQuip(st.killedBy))),
+        st.killedBy === 'giving up' ? el('p', `The Wake was abandoned in act ${st.deepestAct}.`) : el('p', 'The Kindling was routed by ', el('b', st.killedBy ?? 'misadventure'), ` in act ${st.deepestAct}. The Wake is over.`),
+      ],
       lb && !won ? el('p.muted', `Last blow: ${lb.target} took ${lb.dmg} from ${lb.by} with ${lb.hpBefore} HP left.`) : null,
       el('div.end-cols',
         el('div',
-          el('h4', 'Party'),
+          el('h4', 'The Kindling'),
           el('div.member-list', run.party.map((m) => {
             const d = CHARACTERS[m.def];
             return el('div.member-row', portrait(d.sprite, d.name, 32, { ko: m.hp <= 0 }), el('span.li-name', d.name), el('span.muted', 'Lv ' + m.level));
           })),
           el('h4', 'Numbers'),
-          el('div.stat-grid', stat('Act', st.deepestAct), stat('Stops', done), stat('Fights', st.fights), stat('Kills', st.kills), stat('Turns', st.turns), stat('Perfects', st.perfects), stat('Breaks', st.breaks), stat('Gold', run.gold)),
+          el('div.stat-grid', stat('Act', st.deepestAct), stat('Stops', done), stat('Fights', st.fights), stat('Routed', st.kills), stat('Turns', st.turns), stat('Brights', st.perfects), stat('Breaks', st.breaks), stat('Buttons', run.gold)),
           consumables.length ? el('p.muted.small', 'Unused: ' + consumables.map((i) => `${ITEMS[i.def].name} x${i.qty}`).join(', ')) : null,
         ),
         el('div',
@@ -59,6 +64,7 @@ export class EndScreen implements Screen {
         ),
       ),
       fresh.length ? el('div.unlocked', el('h4', 'Unlocked!'), fresh.map((u) => el('div', el('b', u.name), el('span.muted', ' — ' + u.desc)))) : null,
+      el('p.muted.small.end-tip', el('b', 'Tip: '), tip()),
       el('div.end-foot', btn('Return to title', () => { play('confirm'); toTitle(this.app); }, 'big', { data: { default: '' } })),
     );
     this.root.replaceChildren(inner);

@@ -4,6 +4,7 @@ import { loadRun } from '../engine/save';
 import type { App } from './app';
 import { BattleScene } from './battle';
 import { EndScreen } from './end';
+import { showIntro } from './intro';
 import { MapScreen } from './map';
 import { openCamp, openEvent, openRecruit, openReward, openShop } from './nodes';
 import { RosterScreen } from './roster';
@@ -17,10 +18,16 @@ export function toTitle(app: App) {
 
 export function toRoster(app: App) { app.go(new RosterScreen(app)); }
 
+/** Start a new run: the intro plays first, once, before the roster pick. */
+export function toNewRun(app: App) {
+  if (app.settings.seenIntro) toRoster(app);
+  else showIntro(app, () => toRoster(app));
+}
+
 export function beginRun(app: App, seed: number, picks: string[]) {
   app.run = newRun(seed, picks, app.ledger);
   app.lastBlow = null;
-  app.log('The run begins. Seed ' + seed + '.');
+  app.log('A new Wake begins. Seed ' + seed + '.');
   app.persist();
   toMap(app);
 }

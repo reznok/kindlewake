@@ -5,6 +5,9 @@
 import { Rng } from '../core/rng';
 import type { Grade } from '../core/types';
 import { ABILITIES } from '../data/abilities';
+import { CHARACTERS } from '../data/characters';
+import { ENEMIES } from '../data/enemies';
+import { BOSS_MESSAGES } from '../data/text';
 import { ITEMS } from '../data/items';
 import { STATUSES } from '../data/statuses';
 import { type BattleAction, type BattleEvent, type BattleState, type Combatant, alive, byId, hasStatus, step } from '../engine/battle';
@@ -16,7 +19,8 @@ import { music, play } from './audio';
 import { CommandMenu } from './battleMenu';
 import { type Box, type Vis, drawBattle } from './battleView';
 import { frameLoop, Surface } from './canvas';
-import { btn, el } from './dom';
+import { btn, el, fill, plain, rich } from './dom';
+import { eliteBarks, members, speaker } from './flavour';
 import { toEnd, toMap } from './flow';
 import { Fx } from './fx';
 import { toggleHelp } from './help';
@@ -119,10 +123,47 @@ export class BattleScene implements Screen {
 
   /** Narrate on the message line; `log` lines also go to the run log. */
   say(text: string, log = true) {
-    if (log) { this.lines.push(text); this.app.log(text); if (this.lines.length > 20) this.lines.shift(); }
+    if (log) { this.lines.push(text); this.app.log(plain(text)); if (this.lines.length > 20) this.lines.shift(); }
     const n = this.lines.length;
-    this.msgPrev.textContent = (log ? this.lines[n - 2] : this.lines[n - 1]) ?? '';
-    this.msgCur.textContent = text;
+    this.msgPrev.textContent = plain((log ? this.lines[n - 2] : this.lines[n - 1]) ?? '');
+    fill(this.msgCur, rich(text));
+  }
+
+  /** A big centred card for story beats (shape changes, entrance barks). Holds `ms` or until tapped. */
+  async bigLine(text: string, opts: { who?: string; extra?: string; bark?: boolean; ms?: number } = {}) {
+    if (!this.live) return;
+    const card = el('div.phase-card' + (opts.bark ? '.bark' : ''),
+      opts.who ? el('span.who', opts.who) : null, rich(text), opts.extra ? el('span.extra', rich(opts.extra)) : null);
+    this.say(opts.who && !/^\*[^*]+\*$/.test(text) ? `${opts.who}: "${text}"` : text);
+    if (opts.extra) this.say(opts.extra);
+    const words = (text + ' ' + (opts.extra ?? '')).split(/\s+/).length;
+    const ms = opts.ms ?? Math.min(6500, 1400 + words * 160);
+    await new Promise<void>((res) => {
+      const done = () => { clearTimeout(timer); card.remove(); res(); };
+      const timer = setTimeout(done, ms * this.fx.speed);
+      card.addEventListener('pointerdown', (e) => { e.stopPropagation(); done(); });
+      this.root.append(card);
+    });
+  }
+
+  /** A routed foe turns tail and bolts off the left edge in a few hops, then is gone. */
+  private async scarper(id: string) {
+    const v = this.vis(id);
+    const b = this.boxes.get(id);
+    v.facing = -1;
+    v.flash = 0;
+    const dist = (b ? b.x + b.w : 200) + 40;
+    const fx = this.fx;
+    const hops = (async () => { for (let i = 0; i < 4; i++) { await fx.tween(v, 'oy', -10, 70); await fx.tween(v, 'oy', 0, 70); } })();
+    await fx.tween(v, 'ox', -dist, 560, (t) => t * t);
+    await hops;
+    v.alpha = 0;
+  }
+
+  /** A hero's own line on the message line ("Name: ..."; stage directions stand alone). */
+  heroLine(c: Combatant, line: string | undefined) {
+    if (!line) return;
+    this.say(/^\*[^*]+\*$/.test(line) ? line : `${speaker(c.def)}: "${line}"`);
   }
 
   /** Switch an actor's sprite animation (idle / attack / hurt / cast); the view times it from now. */
@@ -228,8 +269,34 @@ export class BattleScene implements Screen {
 
   // ------------------------------------------------------------ turn loop
 
+  /** Entrance barks for Bigwigs (and the party's answers), shown in place of the encounter's plain intro line. */
+  private entranceBarks(): { def: string; name: string }[] {
+    return this.state.enemies.filter((e) => eliteBarks(e.def)).map((e) => ({ def: e.def, name: e.name }));
+  }
+
+  private async playBarks() {
+    const here = this.app.run ? members(this.app.run) : new Set<string>();
+    for (const e of this.entranceBarks()) {
+      const b = eliteBarks(e.def);
+      await this.bigLine(b.intro, { who: e.name, bark: true });
+      for (const [who, r] of Object.entries(b.replies ?? {})) {
+        if (!here.has(who)) continue;
+        this.say(`${speaker(who)}: "${r.line}"`);
+        await this.fx.wait(1300);
+        if (r.answer) { this.say(`${e.name}: "${r.answer}"`); await this.fx.wait(1300); }
+      }
+    }
+  }
+
   private async loop() {
-    await this.playEvents(this.state.events.slice());
+    const first = this.state.events.slice();
+    if (this.entranceBarks().length) {
+      // the bark replaces the encounter's intro line (same words)
+      const intro = plain(this.state.encounter.intro ?? '').replace(/["“”]/g, '');
+      const rest = first.filter((e) => !(e.kind === 'msg' && plain(e.text).replace(/["“”]/g, '') === intro));
+      await this.playBarks();
+      await this.playEvents(rest);
+    } else await this.playEvents(first);
     while (this.live && !this.state.over) {
       const id = this.state.actor;
       const c = id ? byId(this.state, id) : null;
@@ -267,6 +334,7 @@ export class BattleScene implements Screen {
     await this.playEvents(evs);
     await home;
     this.setAnim(c.id, 'idle');
+    if (grades.includes('perfect') && !c.ko && Math.random() < 0.2) { this.heroLine(c, CHARACTERS[c.def]?.lines.perfect); await this.fx.wait(700); }
   }
 
   private async enemyTurn(c: Combatant) {
@@ -274,6 +342,7 @@ export class BattleScene implements Screen {
     const ab = plan ? ABILITIES[plan.ability] : undefined;
     const hits = ab?.hits?.length ?? 0;
     this.say(plan ? `${c.name}: ${plan.intent.name}!` : `${c.name} acts.`);
+    if (plan) await this.bossBark(c, plan.intent.id);
     let guard: Grade[] = [];
     const targets = (plan?.targets ?? []).filter((id) => { const t = byId(this.state, id); return t && !t.ko && t.side === 'hero'; });
     if (hits > 0 && targets.length) {
@@ -297,6 +366,20 @@ export class BattleScene implements Screen {
     await this.playEvents(evs);
     await home;
     this.setAnim(c.id, 'idle');
+  }
+
+  /** Boss shapes shout on some intents; one shape's speech escalates once per loop. */
+  private speechCount = 0;
+  private async bossBark(c: Combatant, intent: string) {
+    const m = (BOSS_MESSAGES as Record<string, (typeof BOSS_MESSAGES)['a1_thief'] | undefined>)[c.def];
+    if (!m) return;
+    let line: string | undefined;
+    if (intent === 'smoke') line = m.smokeBomb;
+    else if (intent === 'odo_protect') line = m.odoProtect;
+    else if (intent === 'speech') line = m.speech[Math.min(m.speech.length - 1, this.speechCount++)];
+    if (!line) return;
+    this.say(`"${line}"`);
+    await this.fx.wait(900);
   }
 
   private preview(c: Combatant, a: BattleAction): { hits: number; targets: string[]; label: string } {
@@ -342,14 +425,14 @@ export class BattleScene implements Screen {
       const v = this.vis(id);
       if (g === 'perfect') {
         this.fx.freeze(60);
-        this.fx.float(b.cx, b.y - 6, 'PERFECT!', '#ffe14d', 24, 1000);
+        this.fx.float(b.cx, b.y - 6, kind === 'guard' ? 'STEADY!' : 'BRIGHT!', '#ffe14d', 24, 1000);
         this.fx.burst(b.cx, b.cy, '#ffe14d', 14, true);
         this.fx.shake(6, 160);
       } else if (g === 'good') {
-        this.fx.float(b.cx, b.y - 6, kind === 'guard' ? 'Guard' : 'Good', kind === 'guard' ? '#7df9ff' : '#ffffff', 18, 800);
+        this.fx.float(b.cx, b.y - 6, kind === 'guard' ? 'Guard' : 'Warm', kind === 'guard' ? '#7df9ff' : '#ffffff', 18, 800);
         this.fx.burst(b.cx, b.cy, '#ffffff', 6, false);
       } else {
-        this.fx.float(b.cx, b.y - 6, '...', '#c8d0e0', 18, 700);
+        this.fx.float(b.cx, b.y - 6, 'Cold', '#c8d0e0', 18, 700);
       }
       if (kind === 'attack' || g !== 'miss') { v.flash = 1; void this.fx.tween(v, 'flash', 0, 220); }
       if (kind === 'attack') this.setAnim(id, 'hurt');
@@ -400,8 +483,19 @@ export class BattleScene implements Screen {
       case 'counter': {
         const b = box(e.target), v = this.vis(e.target);
         v.hp = Math.max(0, v.hp - e.dmg);
-        this.say(`${this.nm(e.who)} hits back!`, false);
+        const who = byId(this.state, e.who);
+        const rehearsed = !!who && hasPassive(who.passives, 'rehearsed');
+        if (rehearsed) {
+          // "I know.": make the punish unmistakable, over both sides
+          const wb = box(e.who);
+          const line = eliteBarks(who!.def)?.counter ?? 'I know.';
+          if (wb) fx.float(wb.cx, wb.y - 20, line, '#b197fc', 26, 1400);
+          if (b) fx.float(b.cx, b.y - 10, 'COUNTERED!', '#ff8fab', 20, 1200);
+          fx.shake(7, 220);
+          this.say(`${who!.name}: "${line}" Repeating a command gets countered.`, false);
+        } else this.say(`${this.nm(e.who)} hits back!`, false);
         if (b) { fx.float(b.cx, b.cy, String(e.dmg), '#ffb35c', 19); v.flash = 1; void fx.tween(v, 'flash', 0, 200); }
+        if (rehearsed) await fx.wait(500);
         play('hit');
         await fx.wait(260);
         return;
@@ -446,6 +540,8 @@ export class BattleScene implements Screen {
         fx.shake(10, 300);
         play('break');
         await fx.wait(480);
+        const cr = eliteBarks(byId(this.state, e.target)?.def ?? '')?.cracked;
+        if (cr) { this.say(`${this.nm(e.target)}: "${cr}"`); await fx.wait(900); }
         return;
       }
       case 'recover': {
@@ -460,8 +556,17 @@ export class BattleScene implements Screen {
         const v = this.vis(e.target);
         v.hp = 0;
         play('ko');
-        this.say(c?.side === 'enemy' ? `${this.nm(e.target)} is defeated.` : `${this.nm(e.target)} is down!`);
-        await fx.tween(v, 'alpha', c?.side === 'enemy' ? 0 : 0.5, 420, (t) => t);
+        if (c?.side === 'enemy') {
+          this.say(`${this.nm(e.target)} is routed!`);
+          const d = ENEMIES[c.def];
+          const last = eliteBarks(c.def)?.routed ?? (d?.boss ? (BOSS_MESSAGES as Record<string, { defeat?: string }>)[c.def]?.defeat : undefined);
+          await this.scarper(e.target);
+          if (last) { this.say(/^\*[^*]+\*$/.test(last) || d?.boss ? last : `${c.name}: "${last}"`); await fx.wait(1200); }
+        } else {
+          this.say(`${this.nm(e.target)} is down!`);
+          await fx.tween(v, 'alpha', 0.5, 420, (t) => t);
+          if (c) { this.heroLine(c, CHARACTERS[c.def]?.lines.ko); await fx.wait(900); }
+        }
         return;
       }
       case 'revive': {
@@ -509,10 +614,13 @@ export class BattleScene implements Screen {
         return;
       }
       case 'phase': {
-        this.say(e.message);
-        fx.showBanner(e.message, '#ff8fab', 1200);
+        const c = byId(this.state, e.who);
+        const variants = c ? (BOSS_MESSAGES as Record<string, { phaseVariants?: Record<number, Record<string, string>> }>)[c.def]?.phaseVariants?.[c.phase] : undefined;
+        const here = this.app.run ? members(this.app.run) : new Set<string>();
+        const extra = variants ? Object.entries(variants).find(([who]) => here.has(who))?.[1] : undefined;
         fx.shake(8, 400);
-        await fx.wait(1000);
+        play('break');
+        await this.bigLine(e.message, { extra });
         return;
       }
       case 'tick': {
@@ -564,8 +672,8 @@ export class BattleScene implements Screen {
       this.app.persist();
       openReward(this.app);
     } else if (r === 'lose') {
-      this.fx.showBanner('The party falls...', '#ff8fab', 1500);
-      this.say('The party falls.');
+      this.fx.showBanner('The candle gutters...', '#ff8fab', 1500);
+      this.say('The Kindling is routed. The candle gutters.');
       await this.fx.wait(1500);
       if (!this.live) return;
       this.app.lastBlow = this.lastHeroHit;

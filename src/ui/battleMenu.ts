@@ -2,7 +2,7 @@
 import type { ItemInst, TargetMode } from '../core/types';
 import { ABILITIES } from '../data/abilities';
 import { ITEMS } from '../data/items';
-import { type BattleAction, type Combatant, alive, legalActions } from '../engine/battle';
+import { type BattleAction, type Combatant, alive, commandKey, legalActions, rehearsedFoes } from '../engine/battle';
 import { play } from './audio';
 import type { BattleScene } from './battle';
 import { btn, el, fill } from './dom';
@@ -73,6 +73,25 @@ export class CommandMenu {
     return navKey(this.root, e);
   }
 
+  /**
+   * While a foe that punishes repeats stands, the command that would repeat the last one wears an eye and a hint, so
+   * repeating it is a visible choice.
+   */
+  private seen(b: HTMLButtonElement, a: BattleAction | null): HTMLButtonElement {
+    const s = this.sc.state;
+    const foes = rehearsedFoes(s);
+    if (!foes.length || !s.lastCommand) return b;
+    const hit = a ? commandKey(s, a) === s.lastCommand : false;
+    if (!hit) return b;
+    const hint = `Seen that one: ${foes[0].name} counters a repeated command.`;
+    b.classList.add('seen-cmd');
+    b.title = hint;
+    b.append(el('span.seen', { attrs: { 'aria-label': 'Seen that one' } }, '👁'));
+    b.addEventListener('focus', () => this.sc.say(hint, false));
+    b.addEventListener('pointerenter', () => this.sc.say(hint, false));
+    return b;
+  }
+
   private show(mode: Mode) {
     this.mode = mode;
     const s = this.sc.state;
@@ -83,23 +102,24 @@ export class CommandMenu {
     if (mode === 'main') {
       const foes = alive(s.enemies);
       fill(this.root, el('div.cmd-grid',
-        hk(btn('Attack', () => this.pickTarget(foes.map((f) => f.id), (id) => ({ t: 'attack', target: id })), 'cmd-btn attack', { data: { default: '' } })),
-        hk(btn('Skill', () => { play('menu'); this.show('skill'); }, 'cmd-btn', { disabled: !legal.skills.length })),
-        hk(btn('Item', () => { play('menu'); this.show('item'); }, 'cmd-btn', { disabled: !legal.items.length })),
+        hk(this.seen(btn('Attack', () => this.pickTarget(foes.map((f) => f.id), (id) => ({ t: 'attack', target: id })), 'cmd-btn attack', { data: { default: '' } }), { t: 'attack', target: '' })),
+        hk(this.seen(btn('Skill', () => { play('menu'); this.show('skill'); }, 'cmd-btn', { disabled: !legal.skills.length }), legal.skills.find((k) => k.id === s.lastCommand) ? { t: 'skill', id: s.lastCommand! } : null)),
+        hk(this.seen(btn('Item', () => { play('menu'); this.show('item'); }, 'cmd-btn', { disabled: !legal.items.length }), legal.items.map((i): BattleAction => ({ t: 'item', item: i.id })).find((a) => commandKey(s, a) === s.lastCommand) ?? null)),
         hk(btn('Guard', () => this.done({ t: 'guard' }), 'cmd-btn')),
         hk(btn('Swap', () => { play('menu'); this.show('swap'); }, 'cmd-btn', { disabled: !legal.swap.length })),
         hk(btn('Flee', () => this.done({ t: 'flee' }), 'cmd-btn', { disabled: !legal.flee, title: legal.flee ? 'Try to escape' : 'Cannot flee this fight' })),
       ));
-      this.sc.say(`${this.hero.name}'s turn.`, false);
+      const watch = rehearsedFoes(s);
+      this.sc.say(watch.length && s.lastCommand ? `${this.hero.name}'s turn. ${watch[0].name} is watching for repeats.` : `${this.hero.name}'s turn.`, false);
     } else if (mode === 'skill') {
       this.list('Skills', legal.skills.map((k) => {
         const a = ABILITIES[k.id];
         const types = [...new Set((a.hits ?? []).map((h) => h.type))];
-        const b = btn([el('span.li-name', a.name), types.map(typeTag), (a.hits?.length ?? 0) > 1 ? el('span.hits', 'x' + a.hits!.length) : null, el('span.li-cost', a.mp ? a.mp + ' MP' : 'free')],
+        const b = btn([el('span.li-name', a.name), types.map(typeTag), (a.hits?.length ?? 0) > 1 ? el('span.hits', 'x' + a.hits!.length) : null, el('span.li-cost', { title: 'Moxie (MP)' }, a.mp ? a.mp + ' MP' : 'free')],
           () => this.useTarget(a.target, (target) => ({ t: 'skill', id: k.id, target })), 'li', { disabled: !k.ok, title: k.why ?? a.desc });
         b.addEventListener('focus', () => this.sc.say(a.desc + (k.why ? ' (' + k.why + ')' : ''), false));
         b.addEventListener('pointerenter', () => this.sc.say(a.desc + (k.why ? ' (' + k.why + ')' : ''), false));
-        return hk(b);
+        return hk(this.seen(b, { t: 'skill', id: k.id }));
       }));
     } else if (mode === 'item') {
       this.list('Items', legal.items.map((it: ItemInst) => {
@@ -108,14 +128,14 @@ export class CommandMenu {
           () => this.useTarget(d.use!.target, (target) => ({ t: 'item', item: it.id, target })), 'li', { title: d.desc });
         b.addEventListener('focus', () => this.sc.say(d.desc, false));
         b.addEventListener('pointerenter', () => this.sc.say(d.desc, false));
-        return hk(b);
+        return hk(this.seen(b, { t: 'item', item: it.id }));
       }));
     } else if (mode === 'swap') {
-      this.list('Swap in', legal.swap.map((mid) => {
+      this.list('Call from the Wagon', legal.swap.map((mid) => {
         const c = s.bench.find((b) => b.member === mid)!;
         return hk(btn([el('span.li-name', c.name), el('span.li-cost', `${c.hp}/${c.maxHp} HP`)], () => this.done({ t: 'swap', member: mid }), 'li'));
       }));
-      this.sc.say('Swapping costs this turn. The newcomer acts soon.', false);
+      this.sc.say('Calling up from the Wagon (bench) costs this turn. The newcomer acts soon.', false);
     }
     requestAnimationFrame(() => { if (this.visible && !(document.activeElement && this.root.contains(document.activeElement))) focusFirst(this.root); });
   }

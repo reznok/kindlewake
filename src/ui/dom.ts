@@ -58,6 +58,14 @@ export function append(node: HTMLElement, kids: Child[]) {
   }
 }
 
+/** Flavour-text markup: `*words*` render in italics (stage directions, emphasis). */
+export function rich(text: string): Child[] {
+  return text.split(/(\*[^*]+\*)/g).filter(Boolean).map((p) => (p.length > 2 && p.startsWith('*') && p.endsWith('*') ? el('i', p.slice(1, -1)) : p));
+}
+
+/** Flavour text with the markup removed (single-line, plain contexts). */
+export function plain(text: string): string { return text.replace(/\*([^*]+)\*/g, '$1'); }
+
 /** Replace all children. */
 export function fill(node: HTMLElement, ...kids: Child[]) {
   node.replaceChildren();

@@ -15,7 +15,7 @@ export function openSparkPick(app: App, memberId: string): Sheet { return openPa
 
 export function openParty(app: App, focus?: string): Sheet {
   const run = app.run!;
-  const s = new Sheet(app, { title: 'Party', cls: 'wide tall' });
+  const s = new Sheet(app, { title: 'Your Kindling', cls: 'wide tall' });
   let sel = focus ?? run.party.find((m) => m.pendingSparks > 0)?.id ?? run.active[0] ?? run.party[0]?.id;
 
   const card = (m: PartyMember) => {
@@ -45,13 +45,13 @@ export function openParty(app: App, focus?: string): Sheet {
       el('div.detail-head', portrait(d.sprite, d.name, 60, { ko: m.hp <= 0 }), el('div.grow',
         el('h3', d.name, el('small', ' Lv ' + m.level)),
         el('div.role-chip', { style: { background: ROLE_COLOR[d.role] } }, cap(d.role)),
-        el('div.bars', bar(m.hp, st.hp, 'hp', `HP ${m.hp}/${st.hp}`), bar(m.mp, st.mp, 'mp', `MP ${m.mp}/${st.mp}`),
+        el('div.bars', bar(m.hp, st.hp, 'hp', `HP ${m.hp}/${st.hp}`), Object.assign(bar(m.mp, st.mp, 'mp', `MP ${m.mp}/${st.mp}`), { title: 'Moxie (MP)' }),
           bar(m.xp - lo, Math.max(1, hi - lo), 'xp', m.level >= MAX_LEVEL ? 'Max level' : `XP ${m.xp - lo}/${hi - lo}`)),
       )),
       offers.length ? el('div.spark-pick', el('h4', 'Pick a spark'), el('div.option-grid', offers.map((sp) => btn([el('b', sp.name), el('span.muted', sp.desc)], () => {
         if (pickSpark(run, m.id, sp.id)) { play('buff'); app.log(`${d.name} learned ${sp.name}.`); app.persist(); render(); }
       }, 'relic-card', { data: { default: '' } })))) : null,
-      el('div.lineup-actions', el('span.muted', isActive ? 'Active. Swap with: ' : 'Bench. Swap in for: '),
+      el('div.lineup-actions', el('span.muted', isActive ? 'On the Front. Send to the Wagon for: ' : 'In the Wagon (bench). Call up for: '),
         others.length ? others.map((o) => btn(CHARACTERS[o.def].name, () => swap(o.id), 'small')) : el('span.muted', 'nobody')),
       statGrid(st),
       el('h4', 'Gear'),
