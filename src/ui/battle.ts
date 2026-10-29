@@ -27,6 +27,7 @@ import { Fx } from './fx';
 import { toggleHelp } from './help';
 import { isConfirm, keyDir } from './input';
 import { openReward } from './nodes';
+import { Sheet } from './sheet';
 import { cap, TYPE_COLOR } from './palette';
 import type { Anim } from './sprites';
 import { TimingRunner, windowSizes } from './timing';
@@ -50,7 +51,10 @@ export class BattleScene implements Screen {
   private visMap = new Map<string, Vis>();
   private msgPrev = el('div.msg-prev');
   private msgCur = el('div.msg-cur');
+  /** Every narrated line this fight (with markup); the message box shows the last two, the log sheet all of them. */
   private lines: string[] = [];
+  private logSheet: Sheet | null = null;
+  private logList = el('ol.fight-log');
   private autoBtn!: HTMLButtonElement;
   private fastBtn!: HTMLButtonElement;
   private live = true;
@@ -80,7 +84,8 @@ export class BattleScene implements Screen {
     this.fastBtn = btn('Fast', () => this.toggleFast(), 'toggle small');
     this.muteBtn = btn('♪', () => { toggleMute(); this.applyToggles(); }, 'toggle small round', { title: 'Sound on / off (M)' });
     const tools = el('div.battle-tools', this.autoBtn, this.fastBtn, this.muteBtn, btn('?', () => toggleHelp(this.app), 'toggle small round', { title: 'Help (?)' }));
-    const bottom = el('div.battle-bottom', el('div.msg', this.msgPrev, this.msgCur), this.menu.root);
+    const msg = el('div.msg', { title: 'Full fight log (L)', onclick: () => { if (!this.timing.active) this.openLog(); } }, this.msgPrev, this.msgCur);
+    const bottom = el('div.battle-bottom', msg, this.menu.root);
     this.root.replaceChildren(wrap, tools, bottom);
     this.surf = new Surface(wrap);
     this.surf.canvas.addEventListener('pointerdown', (e) => this.onCanvasDown(e));
@@ -106,6 +111,7 @@ export class BattleScene implements Screen {
 
   unmount() {
     this.live = false;
+    this.logSheet?.close();
     this.stop?.();
     this.timing.cancel();
     this.menu.cancel();
@@ -139,10 +145,34 @@ export class BattleScene implements Screen {
 
   /** Narrate on the message line; `log` lines also go to the run log. */
   say(text: string, log = true) {
-    if (log) { this.lines.push(text); this.app.log(plain(text)); if (this.lines.length > 20) this.lines.shift(); }
+    if (log) {
+      this.lines.push(text);
+      this.app.log(plain(text));
+      if (this.lines.length > 400) { this.lines.shift(); this.logList.firstElementChild?.remove(); }
+      this.appendLogLine(text);
+    }
     const n = this.lines.length;
     this.msgPrev.textContent = plain((log ? this.lines[n - 2] : this.lines[n - 1]) ?? '');
     fill(this.msgCur, rich(text));
+  }
+
+  /** Add a line to the log list; while the sheet is open and scrolled to the end, keep it pinned there. */
+  private appendLogLine(text: string) {
+    const body = this.logSheet?.body;
+    const atEnd = !body || body.scrollTop + body.clientHeight >= body.scrollHeight - 24;
+    this.logList.append(el('li', rich(text)));
+    if (body && atEnd) body.scrollTop = body.scrollHeight;
+  }
+
+  /** The scrollable log of everything said this fight. Tap the message box or press L. */
+  openLog() {
+    if (this.logSheet?.isOpen) { this.logSheet.close(); return; }
+    play('menu');
+    const s = new Sheet(this.app, { title: 'Fight log', cls: 'wide tall', onClose: () => { this.logSheet = null; } });
+    s.fill([this.logList]);
+    s.key = (e) => { if (e.key === 'l' || e.key === 'L') { s.close(); return true; } return false; };
+    this.logSheet = s.open();
+    s.body.scrollTop = s.body.scrollHeight;
   }
 
   /** A big centred card for story beats (shape changes, entrance barks). Holds `ms` or until tapped. */
@@ -242,6 +272,7 @@ export class BattleScene implements Screen {
       return false;
     }
     if (e.key === 'Tab') return true;
+    if (e.key === 'l' || e.key === 'L') { this.openLog(); return true; }
     if (this.menu.visible) return this.menu.key(e);
     return isConfirm(e);
   }
@@ -396,6 +427,7 @@ export class BattleScene implements Screen {
     if (pv.hits > 0 && pv.targets.length) {
       await this.windup(c, pv.targets);
       const sizes = windowSizes(this.app.settings, { luck: c.base.luck, wideRelic: hasPassive(this.state.partyPassives, 'timingWide'), shock: !!hasStatus(c, 'shock') });
+      this.logSheet?.close(); // a ring is coming: do not let the log hide it
       grades = await this.timing.run('attack', pv.targets, pv.hits, sizes);
     } else await this.hop(c);
     if (!this.live) return;
@@ -434,6 +466,7 @@ export class BattleScene implements Screen {
       } else {
         const h = byId(this.state, canGuard[0])!;
         const sizes = windowSizes(this.app.settings, { luck: h.base.luck, wideRelic: hasPassive(this.state.partyPassives, 'timingWide') });
+        this.logSheet?.close();
         guard = await this.timing.run('guard', canGuard, hits, sizes);
       }
     } else {
